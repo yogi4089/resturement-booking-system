@@ -1,5 +1,6 @@
 const {
   addWaitingMinutes,
+  addWaitingMinutesForCapacityPath,
   assignBookingToTable,
   clearTableResetReadyAt,
   createMenuItem,
@@ -11,6 +12,7 @@ const {
   getBookingById,
   getLatestConfirmedBookingsByTableIds,
   getQueueList,
+  getTableById,
   getTableInventory,
   markBookingSeated,
   removeFromQueue,
@@ -646,13 +648,24 @@ async function extendAdminBooking(req, res, next) {
     }
 
     await extendBookingExpectedEnd(booking.id, 15);
-    req.session.flash = { type: "info", text: `Booking #${booking.id} extended by 15 minutes.` };
+
+    let impactedCount = 0;
+    if (booking.table_id) {
+      const table = await getTableById(booking.table_id);
+      if (table && Number(table.capacity) > 0) {
+        impactedCount = await addWaitingMinutesForCapacityPath(table.capacity, 15);
+      }
+    }
+
+    req.session.flash = {
+      type: "info",
+      text: `Booking #${booking.id} extended by 15 minutes; updated ${impactedCount} waiting guest(s).`
+    };
     return res.redirect(returnTo);
   } catch (error) {
     next(error);
   }
 }
-
 async function promoteAdminQueueBooking(req, res, next) {
   try {
     const returnTo = resolveReturnTo(req, "/admin/waiting-list");
@@ -778,6 +791,8 @@ module.exports = {
   toggleAdminMenuItem,
   updateAdminTableStatus
 };
+
+
 
 
 

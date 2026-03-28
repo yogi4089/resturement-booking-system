@@ -235,7 +235,63 @@ async function addWaitingMinutes(bookingId, minutes) {
      WHERE id = $2 AND status = 'WAITING'`,
     [minutes, bookingId]
   );
-}async function getLatestConfirmedBookingsByTableIds(tableIds = []) {
+}
+
+async function addWaitingMinutesForCapacityPath(capacity, minutes) {
+  const safeCapacity = Number(capacity);
+  const safeMinutes = Number(minutes);
+
+  if (!Number.isFinite(safeCapacity) || safeCapacity <= 0 || !Number.isFinite(safeMinutes) || safeMinutes <= 0) {
+    return 0;
+  }
+
+  const supportsPrediction = await hasColumns("bookings", ["predicted_wait_minutes"]);
+
+  if (supportsPrediction) {
+    const advancedResult = await query(
+      `WITH affected AS (
+         SELECT b.id
+         FROM waiting_queue w
+         JOIN bookings b ON b.id = w.booking_id
+         WHERE b.status = 'WAITING'
+           AND b.guests <= $1
+         ORDER BY w.priority_score DESC, w.arrival_time ASC
+       )
+       UPDATE bookings b
+       SET wait_time_minutes = COALESCE(b.wait_time_minutes, 0) + $2,
+           predicted_wait_minutes = CASE
+             WHEN b.predicted_wait_minutes IS NULL THEN NULL
+             ELSE b.predicted_wait_minutes + $2
+           END
+       FROM affected
+       WHERE b.id = affected.id
+       RETURNING b.id`,
+      [safeCapacity, safeMinutes]
+    );
+
+    return advancedResult.rowCount || 0;
+  }
+
+  const basicResult = await query(
+    `WITH affected AS (
+       SELECT b.id
+       FROM waiting_queue w
+       JOIN bookings b ON b.id = w.booking_id
+       WHERE b.status = 'WAITING'
+         AND b.guests <= $1
+       ORDER BY w.priority_score DESC, w.arrival_time ASC
+     )
+     UPDATE bookings b
+     SET wait_time_minutes = COALESCE(b.wait_time_minutes, 0) + $2
+     FROM affected
+     WHERE b.id = affected.id
+     RETURNING b.id`,
+    [safeCapacity, safeMinutes]
+  );
+
+  return basicResult.rowCount || 0;
+}
+async function getLatestConfirmedBookingsByTableIds(tableIds = []) {
   if (!Array.isArray(tableIds) || tableIds.length === 0) {
     return [];
   }
@@ -272,6 +328,7 @@ async function addWaitingMinutes(bookingId, minutes) {
 }
 module.exports = {
   addWaitingMinutes,
+  addWaitingMinutesForCapacityPath,
   assignBookingToTable,
   createConfirmedBooking,
   createWaitingBooking,
@@ -287,6 +344,8 @@ module.exports = {
   markBookingSeated,
   updateBookingStatus
 };
+
+
 
 
 
