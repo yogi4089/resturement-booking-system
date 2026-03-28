@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= title %> | Aurevo Dining</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="page-shell">
+  <%- include('partials/admin-topbar', { activeAdminTab }) %>
+  <%- include('partials/admin-toast') %>
+
+  <section class="subpage-hero admin-page-hero">
+    <div class="container subpage-copy">
+      <p class="eyebrow">Menu</p>
+      <h1>Control dish availability from admin.</h1>
+      <p class="subpage-note">Keep menu updates synced with live operations.</p>
+    </div>
+  </section>
+
+  <section class="container pb-5">
+    <section class="dashboard-panel">
+      <div class="panel-header">
+        <span class="panel-kicker">Menu Admin</span>
+        <h2>Update dishes and availability</h2>
+        <p>Manage dish list shown to guests and floor team.</p>
+      </div>
+
+      <form action="/admin/menu" method="post" class="row g-3 mb-4">
+        <div class="col-md-7"><input class="form-control luxury-input" type="text" name="name" placeholder="Dish name" required></div>
+        <div class="col-md-3"><input class="form-control luxury-input" type="number" step="0.01" min="0" name="price" placeholder="Price" required></div>
+        <div class="col-md-2"><button class="btn btn-gold w-100" type="submit">Add</button></div>
+      </form>
+
+      <div class="list-stack">
+        <% if (!menuItems.length) { %>
+          <div class="empty-state tight">
+            <h3>No menu items found</h3>
+            <p>Add your first menu item above.</p>
+          </div>
+        <% } %>
+        <% menuItems.forEach((item) => { %>
+          <article class="list-card">
+            <div>
+              <h3><%= item.name %></h3>
+              <p>Rs. <%= Number(item.price).toFixed(0) %> · <%= item.availability ? "Available" : "Unavailable" %></p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+              <form action="/admin/menu/<%= item.id %>/toggle" method="post">
+                <button class="btn btn-outline-light btn-sm" type="submit">Toggle</button>
+              </form>
+              <form action="/admin/menu/<%= item.id %>/delete" method="post" onsubmit="return confirm('Delete this menu item permanently?');">
+                <button class="btn btn-outline-light btn-sm" type="submit">Delete</button>
+              </form>
+            </div>
+          </article>
+        <% }) %>
+      </div>
+    </section>
+  </section>
+
+  <footer class="luxury-footer">
+    <div class="container">
+      <div class="footer-copy">Tight menu control supports reliable service promises at the host desk.</div>
+      <div class="footer-copy">Aurevo Dining House</div>
+    </div>
+  </footer>
+</body>
+</html>

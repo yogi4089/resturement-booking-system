@@ -1,0 +1,28 @@
+<% if (flash) { %>
+  <div id="adminLoginToast" class="admin-toast-wrap" role="status" aria-live="polite">
+    <div class="alert alert-<%= flash.type %> shadow-sm admin-toast-alert">
+      <span><%= flash.text %></span>
+      <button type="button" class="admin-toast-close" aria-label="Dismiss notification">&times;</button>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const toast = document.getElementById('adminLoginToast');
+      if (!toast) return;
+
+      const closeBtn = toast.querySelector('.admin-toast-close');
+      const dismiss = function () {
+        toast.classList.add('is-hidden');
+        setTimeout(function () {
+          toast.remove();
+        }, 260);
+      };
+
+      if (closeBtn) {
+        closeBtn.addEventListener('click', dismiss);
+      }
+
+      setTimeout(dismiss, 2000);
+    })();
+  </script>
+<% } %>

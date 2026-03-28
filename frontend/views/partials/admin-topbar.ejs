@@ -1,0 +1,17 @@
+<header class="topbar admin-topbar">
+  <div class="container d-flex flex-wrap align-items-center gap-3 py-3">
+    <a class="brand-mark text-decoration-none" href="/">
+      <span class="brand-script">Aurevo</span>
+      <span class="brand-sub">Dining House</span>
+    </a>
+    <nav class="nav nav-pills luxury-nav admin-luxury-nav">
+      <a class="nav-link <%= activeAdminTab === 'tables' ? 'active' : '' %>" href="/admin/tables">Tables</a>
+      <a class="nav-link <%= activeAdminTab === 'waiting-list' ? 'active' : '' %>" href="/admin/waiting-list">Waiting List</a>
+      <a class="nav-link <%= activeAdminTab === 'menu' ? 'active' : '' %>" href="/admin/menu">Menu</a>
+    </nav>
+    <form action="/admin/logout" method="post" class="ms-auto admin-nav-logout">
+      <button class="admin-logout-link" type="submit">Logout</button>
+    </form>
+  </div>
+</header>
+
