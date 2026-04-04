@@ -20,7 +20,16 @@ function broadcastUpdate() {
   }
 }
 
+function broadcastAlert(type, message) {
+  const payload = JSON.stringify({ type, message, timestamp: new Date().toISOString() });
+  const sseMessage = `event: alert\ndata: ${payload}\n\n`;
+  for (const client of clients) {
+    client.write(sseMessage);
+  }
+}
+
 module.exports = {
   eventsHandler,
-  broadcastUpdate
+  broadcastUpdate,
+  broadcastAlert
 };

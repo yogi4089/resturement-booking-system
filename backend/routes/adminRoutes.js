@@ -19,6 +19,7 @@ const {
   toggleAdminMenuItem,
   updateAdminTableStatus
 } = require("../controllers/adminController");
+const { renderInsightsPage } = require("../controllers/insightsController");
 const { requireAdmin } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -30,6 +31,7 @@ router.get("/admin", requireAdmin, redirectAdminRoot);
 router.get("/admin/tables", requireAdmin, renderAdminTablesPage);
 router.get("/admin/waiting-list", requireAdmin, renderAdminWaitingListPage);
 router.get("/admin/menu", requireAdmin, renderAdminMenuPage);
+router.get("/admin/insights", requireAdmin, renderInsightsPage);
 
 router.post("/admin/tables/:id/status", requireAdmin, updateAdminTableStatus);
 router.post("/admin/tables/:id/reset-done", requireAdmin, resetDoneAdminTable);

@@ -6,6 +6,14 @@
       window.location.reload();
     });
 
+    // Alert tray SSE handler
+    evtSource.addEventListener("alert", function(e) {
+      try {
+        const alert = JSON.parse(e.data);
+        pushAlert(alert);
+      } catch (_) {}
+    });
+
     window.addEventListener('load', () => {
       const scrollPos = sessionStorage.getItem('scrollPos');
       if (scrollPos) {
@@ -14,4 +22,52 @@
       }
     });
   })();
+
+  let _alertCount = 0;
+
+  function pushAlert(alert) {
+    const list = document.getElementById('alertList');
+    const badge = document.getElementById('alertBadge');
+    if (!list || !badge) return;
+
+    // Remove "no alerts" placeholder
+    const empty = list.querySelector('.alert-empty');
+    if (empty) empty.remove();
+
+    _alertCount++;
+    badge.textContent = _alertCount;
+    badge.style.display = 'flex';
+
+    const iconMap = { vip: '👑', elderly: '🧓', overdue: '⚠️', info: '🔔' };
+    const icon = iconMap[alert.type] || '🔔';
+    const time = new Date(alert.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    const item = document.createElement('div');
+    item.className = `alert-item alert-item--${alert.type}`;
+    item.innerHTML = `<span class="alert-icon">${icon}</span><div><span class="alert-msg">${alert.message}</span><span class="alert-time">${time}</span></div>`;
+    list.prepend(item);
+  }
+
+  function toggleAlertPanel() {
+    const panel = document.getElementById('alertPanel');
+    if (!panel) return;
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function clearAlerts() {
+    const list = document.getElementById('alertList');
+    const badge = document.getElementById('alertBadge');
+    if (list) list.innerHTML = '<div class="alert-empty">No alerts yet</div>';
+    if (badge) { badge.textContent = '0'; badge.style.display = 'none'; }
+    _alertCount = 0;
+  }
+
+  // Close panel when clicking outside
+  document.addEventListener('click', function(e) {
+    const tray = document.getElementById('alertTray');
+    if (tray && !tray.contains(e.target)) {
+      const panel = document.getElementById('alertPanel');
+      if (panel) panel.style.display = 'none';
+    }
+  });
 </script>

@@ -17,6 +17,7 @@ const {
 const { buildAlternativeSlots, buildWaitEstimate, getDurationMinutes } = require("../utils/queueUtils");
 const { formatTime, parseBookingDateTime } = require("../utils/timeUtils");
 const { AVG_DINING_TIME } = require("../config/constants");
+const { broadcastAlert } = require("../utils/sse");
 
 function enrichTablesWithTimeLeft(tables, activeOccupancyRows) {
   const nowMs = Date.now();
@@ -188,6 +189,14 @@ async function addBookingToWaitingList({ req, res, bookingInput, bookingDateTime
     priorityLabel: bookingInput.priority,
     priorityScore: PRIORITY_MAP[bookingInput.priority] || PRIORITY_MAP.STANDARD
   });
+
+  // Fire SSE alert for VIP or Elderly guests joining the queue
+  if (bookingInput.priority === 'VIP' || bookingInput.priority === 'ELDERLY') {
+    broadcastAlert(
+      bookingInput.priority === 'VIP' ? 'vip' : 'elderly',
+      `${bookingInput.priority} joined queue — ${bookingInput.name}, ${bookingInput.guests} guest${bookingInput.guests !== 1 ? 's' : ''}`
+    );
+  }
 
   req.session.flash = {
     type: "warning",

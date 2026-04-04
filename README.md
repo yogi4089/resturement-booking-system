@@ -152,30 +152,28 @@ Admin dashboard shows:
 Project structure:
 
 ```text
-resturent managment/
-+-- frontend/
-|   +-- public/
-|   |   +-- styles.css
-|   +-- views/
-|       +-- home.ejs
-|       +-- menu.ejs
-|       +-- status.ejs
-|       +-- admin-login.ejs
-|       +-- admin-dashboard.ejs
-|       +-- 404.ejs
-|       +-- 500.ejs
-+-- backend/
-|   +-- app.js
-|   +-- server.js
-|   +-- schema.sql
-|   +-- .env.example
-|   +-- config/
-|   +-- controllers/
-|   +-- middleware/
-|   +-- models/
-|   +-- routes/
-|   +-- utils/
-+-- README.md
+restaurant-management/
+├── backend/                  # Server-side code (Node.js/Express)
+│   ├── config/               # Database and constant configurations
+│   ├── controllers/          # Route handlers and business logic orchestration
+│   ├── middleware/           # Express middleware (e.g., authentication)
+│   ├── models/               # Database queries and schema definitions
+│   ├── routes/               # API and page routing definitions
+│   ├── utils/                # Helper functions (SSE, date formatting, queue logic)
+│   ├── app.js                # Express app configuration
+│   ├── schema.sql            # Database schema initialization
+│   └── server.js             # Application entry point
+├── frontend/                 # Client-side assets and views
+│   ├── public/               # Static assets
+│   │   └── styles.css        # Custom CSS styles
+│   └── views/                # EJS templates
+│       ├── partials/         # Reusable UI components
+│       ├── admin-*.ejs       # Admin dashboard views
+│       ├── home.ejs          # Customer booking page
+│       ├── menu.ejs          # Restaurant menu page
+│       └── status.ejs        # Booking status and waitlist page
+├── scripts/                  # Development scripts and patching tools
+└── README.md                 # Project documentation
 ```
 
 ## 11. Database Tables
