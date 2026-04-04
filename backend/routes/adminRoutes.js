@@ -1,4 +1,5 @@
 const express = require("express");
+const { eventsHandler } = require("../utils/sse");
 const {
   completeAdminBooking,
   addAdminWaitingTime,
@@ -41,6 +42,8 @@ router.post("/admin/queue/:bookingId/wait/add", requireAdmin, addAdminWaitingTim
 router.post("/admin/menu", requireAdmin, createAdminMenuItem);
 router.post("/admin/menu/:id/toggle", requireAdmin, toggleAdminMenuItem);
 router.post("/admin/menu/:id/delete", requireAdmin, deleteAdminMenuItem);
+
+router.get("/api/events", requireAdmin, eventsHandler);
 
 module.exports = router;
 

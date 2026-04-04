@@ -1,0 +1,17 @@
+<script>
+  (function() {
+    const evtSource = new EventSource("/api/events");
+    evtSource.addEventListener("data-updated", function() {
+      sessionStorage.setItem('scrollPos', window.scrollY);
+      window.location.reload();
+    });
+
+    window.addEventListener('load', () => {
+      const scrollPos = sessionStorage.getItem('scrollPos');
+      if (scrollPos) {
+        window.scrollTo(0, parseInt(scrollPos));
+        sessionStorage.removeItem('scrollPos');
+      }
+    });
+  })();
+</script>

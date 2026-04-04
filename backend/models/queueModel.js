@@ -21,25 +21,65 @@ async function getQueueList() {
     `SELECT w.*, b.name, b.phone, b.guests, b.wait_time_minutes, b.booking_date, b.booking_time, b.status
      FROM waiting_queue w
      JOIN bookings b ON b.id = w.booking_id
-     ORDER BY w.priority_score DESC, w.arrival_time ASC`
+     ORDER BY 
+       (CASE WHEN (b.booking_date + b.booking_time::interval + (COALESCE(b.wait_time_minutes, 0) || ' minutes')::interval) <= NOW() THEN 0 ELSE 1 END) ASC,
+       w.priority_score DESC,
+       (b.booking_date + b.booking_time::interval + (COALESCE(b.wait_time_minutes, 0) || ' minutes')::interval) ASC`
   );
   return result.rows;
 }
 
+function getGuestRange(capacity) {
+  const c = Number(capacity) || 2;
+  if (c <= 2) return { minGuests: 1, maxGuests: 2 };
+  if (c <= 4) return { minGuests: 1, maxGuests: 4 };
+  if (c <= 6) return { minGuests: 3, maxGuests: 6 };
+  if (c <= 8) return { minGuests: 5, maxGuests: 8 };
+  return { minGuests: c - 3, maxGuests: c };
+}
+
 async function getNextQueueBookingForCapacity(capacity) {
+  const { minGuests, maxGuests } = getGuestRange(capacity);
   const result = await query(
-    `SELECT w.booking_id
+    `SELECT w.booking_id, b.name, b.guests
      FROM waiting_queue w
      JOIN bookings b ON b.id = w.booking_id
-     WHERE b.status = 'WAITING' AND b.guests <= $1
-     ORDER BY w.priority_score DESC, w.arrival_time ASC
+     WHERE b.status = 'WAITING' AND b.guests >= $1 AND b.guests <= $2
+     ORDER BY 
+       (CASE WHEN (b.booking_date + b.booking_time::interval + (COALESCE(b.wait_time_minutes, 0) || ' minutes')::interval) <= NOW() THEN 0 ELSE 1 END) ASC,
+       w.priority_score DESC,
+       (b.booking_date + b.booking_time::interval + (COALESCE(b.wait_time_minutes, 0) || ' minutes')::interval) ASC
      LIMIT 1`,
-    [capacity]
+    [minGuests, maxGuests]
   );
   return result.rows[0] || null;
 }
 
+function getCapacityRange(guests) {
+  const g = Number(guests) || 1;
+  let minCap = 2;
+  if (g > 6) minCap = 8;
+  else if (g > 4) minCap = 6;
+  else if (g > 2) minCap = 4;
+  
+  let maxCap = minCap;
+  if (minCap < 8) maxCap = minCap + 2;
+  
+  if (g > 8) {
+    minCap = g;
+    maxCap = g;
+  }
+  
+  return { minCap, maxCap };
+}
+
 async function getQueueAheadForParty({ partySize, priorityScore }) {
+  const { minCap, maxCap } = getCapacityRange(partySize);
+  // We want to count people ahead of us who might take the tables WE want.
+  // Anyone whose maxGuests allows them to sit at our minCap...maxCap could take our table.
+  // A simple approximation: if their maxCap >= our minCap AND their minCap <= our maxCap
+  // Wait, let's just make it 'anyone ahead of us' for the time being, or keep b.guests <= maxCap.
+  // Let's use maxCap for overlap estimation: b.guests <= maxCap is a decent proxy.
   const result = await query(
     `SELECT COUNT(*)::int AS count
      FROM waiting_queue w
@@ -47,7 +87,7 @@ async function getQueueAheadForParty({ partySize, priorityScore }) {
      WHERE b.status = 'WAITING'
        AND b.guests <= $1
        AND (w.priority_score > $2 OR (w.priority_score = $2 AND w.arrival_time < NOW()))`,
-    [partySize, priorityScore]
+    [maxCap, priorityScore]
   );
   return result.rows[0].count;
 }

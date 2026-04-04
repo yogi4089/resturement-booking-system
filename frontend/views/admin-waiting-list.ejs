@@ -101,7 +101,7 @@
                 <td><%= row.scheduleLabel %></td>
                 <td><span class="badge text-bg-secondary"><%= row.status %></span></td>
                 <td><span class="badge text-bg-dark"><%= row.priority_label %></span></td>
-                <td><%= row.waitRemainingLabel %></td>
+                <td class="dynamic-wait" data-time="<%= row.waitingTill ? row.waitingTill.toISOString() : '' %>"><%= row.waitRemainingLabel %></td>
                 <td><%= row.waitingTillLabel %></td>
                 <td class="admin-col-action">
                   <% if (row.candidateTables.length) { %>
@@ -110,7 +110,7 @@
                       <select name="table_id" class="form-select form-select-sm luxury-input">
                         <% row.candidateTables.forEach((table) => { %>
                           <option value="<%= table.id %>" <%= Number(row.suggestedTableId) === Number(table.id) ? 'selected' : '' %>>
-                            Table <%= table.id %> · <%= table.capacity %> seats
+                            Table <%= table.id %> ï¿½ <%= table.capacity %> seats
                           </option>
                         <% }) %>
                       </select>
@@ -181,6 +181,7 @@
           <option value="STANDARD" <%= readyControls.priority === 'STANDARD' ? 'selected' : '' %>>Standard</option>
         </select>
         <select class="form-select luxury-input" name="rSort">
+          <option value="excess_time_desc" <%= readyControls.sort === 'excess_time_desc' ? 'selected' : '' %>>Wait exceeded (longest first)</option>
           <option value="priority_arrival" <%= readyControls.sort === 'priority_arrival' ? 'selected' : '' %>>Priority then arrival</option>
           <option value="schedule_asc" <%= readyControls.sort === 'schedule_asc' ? 'selected' : '' %>>Schedule time (earliest)</option>
           <option value="guest_asc" <%= readyControls.sort === 'guest_asc' ? 'selected' : '' %>>Guest name (A-Z)</option>
@@ -212,7 +213,7 @@
                 <td class="admin-col-guest"><strong><%= row.name %></strong><small><%= row.phone %> &middot; <%= row.guests %> guests</small></td>
                 <td><span class="badge text-bg-dark"><%= row.priority_label %></span></td>
                 <td><%= row.scheduleLabel %></td>
-                <td><%= row.waitRemainingLabel %></td>
+                <td class="ready-wait-remaining" data-waiting-till="<%= row.waitingTill.toISOString() %>"><%= row.waitRemainingLabel %></td>
                 <td class="admin-col-action">
                   <% if (row.candidateTables.length) { %>
                     <form action="/admin/queue/<%= row.booking_id %>/promote" method="post" class="admin-seat-form">
@@ -220,7 +221,7 @@
                       <select name="table_id" class="form-select form-select-sm luxury-input">
                         <% row.candidateTables.forEach((table) => { %>
                           <option value="<%= table.id %>" <%= Number(row.suggestedTableId) === Number(table.id) ? 'selected' : '' %>>
-                            Table <%= table.id %> · <%= table.capacity %> seats
+                            Table <%= table.id %> ï¿½ <%= table.capacity %> seats
                           </option>
                         <% }) %>
                       </select>
@@ -317,7 +318,7 @@
                 <td class="admin-col-guest"><strong><%= row.booking.name %></strong><small><%= row.booking.phone %> &middot; <%= row.booking.guests %> guests</small></td>
                 <td><%= row.seatedAtLabel %></td>
                 <td><%= row.expectedFreeAtLabel %></td>
-                <td><%= row.remainingLabel %></td>
+                <td class="dynamic-wait" data-time="<%= row.expectedFreeAt ? row.expectedFreeAt.toISOString() : '' %>"><%= row.remainingLabel %></td>
                 <td>
                   <div class="d-flex gap-2 flex-wrap admin-booked-actions">
                     <form action="/admin/bookings/<%= row.booking.id %>/extend" method="post">
@@ -389,8 +390,37 @@
       } else {
         activate('waiting');
       }
+
+      function formatMins(mins) {
+        if (mins >= 60) {
+          const h = Math.floor(mins / 60);
+          const m = mins % 60;
+          return m ? h + 'h ' + m + 'm' : h + 'h';
+        }
+        return mins + 'm';
+      }
+
+      function updateReadyWaitTimes() {
+        const now = new Date();
+        document.querySelectorAll('.ready-wait-remaining, .dynamic-wait').forEach(td => {
+          const timeAttr = td.dataset.waitingTill || td.dataset.time;
+          if (!timeAttr) return;
+          const targetTime = new Date(timeAttr);
+          const diffMs = now - targetTime;
+          if (diffMs > 0) {
+            const mins = Math.floor(diffMs / 60000);
+            td.textContent = '0m (+' + formatMins(mins) + ')';
+          } else {
+            const remains = Math.ceil(-diffMs / 60000);
+            td.textContent = formatMins(remains);
+          }
+        });
+      }
+      setInterval(updateReadyWaitTimes, 60000);
+      updateReadyWaitTimes();
     })();
   </script>
+  <%- include('partials/sse-client') %>
 </body>
 </html>
 

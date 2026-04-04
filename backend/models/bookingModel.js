@@ -1,5 +1,6 @@
 const { query } = require("../config/db");
 const { hasColumns } = require("./schemaSupport");
+const { AVG_DINING_TIME } = require("../config/constants");
 
 async function createConfirmedBooking({ name, phone, bookingDate, bookingTime, guests, tableId, predictedWaitMinutes = 0 }) {
   const supportsPrediction = await hasColumns("bookings", ["predicted_wait_minutes"]);
@@ -211,7 +212,6 @@ async function getNoShowCandidates(graceMinutes) {
   return result.rows;
 }
 
-
 async function addWaitingMinutes(bookingId, minutes) {
   const supportsPrediction = await hasColumns("bookings", ["predicted_wait_minutes"]);
 
@@ -237,60 +237,97 @@ async function addWaitingMinutes(bookingId, minutes) {
   );
 }
 
-async function addWaitingMinutesForCapacityPath(capacity, minutes) {
-  const safeCapacity = Number(capacity);
-  const safeMinutes = Number(minutes);
+function estimateSeatDurationMinutes(guests) {
+  const partySize = Number(guests || 2);
+  if (partySize >= 7) return AVG_DINING_TIME + 30;
+  if (partySize >= 5) return AVG_DINING_TIME + 20;
+  if (partySize >= 3) return AVG_DINING_TIME + 10;
+  return AVG_DINING_TIME;
+}
 
-  if (!Number.isFinite(safeCapacity) || safeCapacity <= 0 || !Number.isFinite(safeMinutes) || safeMinutes <= 0) {
-    return 0;
+function computeTableFreeAtForPath(table, occupancyByTable, now) {
+  if (table.status === "AVAILABLE") {
+    if (table.reset_ready_at) {
+      const resetAt = new Date(table.reset_ready_at);
+      if (!Number.isNaN(resetAt.getTime()) && resetAt > now) {
+        return resetAt;
+      }
+    }
+    return new Date(now);
   }
 
+  const occupancy = occupancyByTable.get(Number(table.id));
+  if (occupancy && occupancy.expected_end_at) {
+    const expected = new Date(occupancy.expected_end_at);
+    if (!Number.isNaN(expected.getTime()) && expected > now) {
+      return expected;
+    }
+  }
+
+  return new Date(now.getTime() + AVG_DINING_TIME * 60000);
+}
+
+async function addWaitingMinutesForEtaWindow({ capacity, addMinutes = 15, etaWindowMinutes = 20 }) {
+  const safeCapacity = Number(capacity);
+  const safeAddMinutes = Number(addMinutes);
+  const safeWindow = Number(etaWindowMinutes);
+
+  if (!Number.isFinite(safeCapacity) || safeCapacity <= 0 || !Number.isFinite(safeAddMinutes) || safeAddMinutes <= 0 || !Number.isFinite(safeWindow) || safeWindow <= 0) {
+    return { impactedTotal: 0, impactedIds: [] };
+  }
+
+  // Directly check each waiting customer's own scheduled time (booking_time + wait_time_minutes).
+  // Impact anyone whose waitingTill is already exceeded (overdue) OR within the next etaWindowMinutes.
+  // This is correct regardless of how far away the table's own ETA is.
   const supportsPrediction = await hasColumns("bookings", ["predicted_wait_minutes"]);
 
-  if (supportsPrediction) {
-    const advancedResult = await query(
-      `WITH affected AS (
-         SELECT b.id
-         FROM waiting_queue w
-         JOIN bookings b ON b.id = w.booking_id
-         WHERE b.status = 'WAITING'
-           AND b.guests <= $1
-         ORDER BY w.priority_score DESC, w.arrival_time ASC
-       )
-       UPDATE bookings b
-       SET wait_time_minutes = COALESCE(b.wait_time_minutes, 0) + $2,
-           predicted_wait_minutes = CASE
-             WHEN b.predicted_wait_minutes IS NULL THEN NULL
-             ELSE b.predicted_wait_minutes + $2
-           END
-       FROM affected
-       WHERE b.id = affected.id
-       RETURNING b.id`,
-      [safeCapacity, safeMinutes]
-    );
-
-    return advancedResult.rowCount || 0;
-  }
-
-  const basicResult = await query(
-    `WITH affected AS (
-       SELECT b.id
-       FROM waiting_queue w
-       JOIN bookings b ON b.id = w.booking_id
-       WHERE b.status = 'WAITING'
-         AND b.guests <= $1
-       ORDER BY w.priority_score DESC, w.arrival_time ASC
-     )
-     UPDATE bookings b
-     SET wait_time_minutes = COALESCE(b.wait_time_minutes, 0) + $2
-     FROM affected
-     WHERE b.id = affected.id
-     RETURNING b.id`,
-    [safeCapacity, safeMinutes]
+  const candidateResult = await query(
+    `SELECT b.id
+     FROM waiting_queue w
+     JOIN bookings b ON b.id = w.booking_id
+     WHERE b.status = 'WAITING'
+       AND b.guests <= $1
+       AND (b.booking_date + b.booking_time + (COALESCE(b.wait_time_minutes, 0) || ' minutes')::interval)
+             <= (NOW() + ($2 || ' minutes')::interval)
+     ORDER BY w.priority_score DESC, w.arrival_time ASC`,
+    [safeCapacity, safeWindow]
   );
 
-  return basicResult.rowCount || 0;
+  const impactedIds = candidateResult.rows.map((row) => Number(row.id));
+
+  if (!impactedIds.length) {
+    return { impactedTotal: 0, impactedIds: [] };
+  }
+
+  if (supportsPrediction) {
+    const updated = await query(
+      `UPDATE bookings
+       SET wait_time_minutes = COALESCE(wait_time_minutes, 0) + $2,
+           predicted_wait_minutes = CASE
+             WHEN predicted_wait_minutes IS NULL THEN NULL
+             ELSE predicted_wait_minutes + $2
+           END
+       WHERE status = 'WAITING'
+         AND id = ANY($1::int[])
+       RETURNING id`,
+      [impactedIds, safeAddMinutes]
+    );
+
+    return { impactedTotal: updated.rowCount || 0, impactedIds: updated.rows.map((row) => row.id) };
+  }
+
+  const updated = await query(
+    `UPDATE bookings
+     SET wait_time_minutes = COALESCE(wait_time_minutes, 0) + $2
+     WHERE status = 'WAITING'
+       AND id = ANY($1::int[])
+     RETURNING id`,
+    [impactedIds, safeAddMinutes]
+  );
+
+  return { impactedTotal: updated.rowCount || 0, impactedIds: updated.rows.map((row) => row.id) };
 }
+
 async function getLatestConfirmedBookingsByTableIds(tableIds = []) {
   if (!Array.isArray(tableIds) || tableIds.length === 0) {
     return [];
@@ -326,9 +363,10 @@ async function getLatestConfirmedBookingsByTableIds(tableIds = []) {
 
   return result.rows;
 }
+
 module.exports = {
   addWaitingMinutes,
-  addWaitingMinutesForCapacityPath,
+  addWaitingMinutesForEtaWindow,
   assignBookingToTable,
   createConfirmedBooking,
   createWaitingBooking,
@@ -344,9 +382,3 @@ module.exports = {
   markBookingSeated,
   updateBookingStatus
 };
-
-
-
-
-
-

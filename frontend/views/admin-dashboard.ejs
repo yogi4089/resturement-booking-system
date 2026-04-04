@@ -118,9 +118,21 @@
                   <button class="btn btn-sm btn-gold w-100" type="submit">Reset done</button>
                 </form>
               <% } else { %>
+              <% } else if (table.status === 'OCCUPIED' && table.activeBookingId) { %>
+                <div class="d-flex gap-2 mt-3">
+                  <form action="/admin/bookings/<%= table.activeBookingId %>/extend" method="post" class="flex-grow-1">
+                    <input type="hidden" name="returnTo" value="/admin">
+                    <button class="btn btn-sm btn-outline-light w-100" type="submit">+15m</button>
+                  </form>
+                  <form action="/admin/tables/<%= table.id %>/status" method="post" class="flex-grow-1">
+                    <input type="hidden" name="status" value="AVAILABLE">
+                    <button class="btn btn-sm btn-gold w-100" type="submit">Completed</button>
+                  </form>
+                </div>
+              <% } else { %>
                 <form action="/admin/tables/<%= table.id %>/status" method="post" class="w-100 mt-3">
                   <input type="hidden" name="status" value="<%= table.status === 'AVAILABLE' ? 'OCCUPIED' : 'AVAILABLE' %>">
-                  <button class="btn btn-sm <%= table.status === 'AVAILABLE' ? 'btn-outline-light' : 'btn-gold' %> w-100" type="submit"><%= table.status === 'AVAILABLE' ? 'Mark Occupied' : 'Mark Free (start reset)' %></button>
+                  <button class="btn btn-sm <%= table.status === 'AVAILABLE' ? 'btn-outline-light' : 'btn-gold' %> w-100" type="submit"><%= table.status === 'AVAILABLE' ? 'Mark Occupied' : 'Completed' %></button>
                 </form>
               <% } %>
             </div>
@@ -246,6 +258,7 @@
       <div class="footer-copy">Aurevo Dining House</div>
     </div>
   </footer>
+  <%- include('partials/sse-client') %>
 </body>
 </html>
 

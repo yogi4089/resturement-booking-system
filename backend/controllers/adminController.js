@@ -1,6 +1,6 @@
 const {
   addWaitingMinutes,
-  addWaitingMinutesForCapacityPath,
+  addWaitingMinutesForEtaWindow,
   assignBookingToTable,
   clearTableResetReadyAt,
   createMenuItem,
@@ -13,6 +13,7 @@ const {
   getLatestConfirmedBookingsByTableIds,
   getQueueList,
   getTableById,
+  getNextQueueBookingForCapacity,
   getTableInventory,
   markBookingSeated,
   removeFromQueue,
@@ -21,6 +22,7 @@ const {
   updateBookingStatus,
   updateTableStatus
 } = require("../models");
+const { broadcastUpdate } = require("../utils/sse");
 const { AVG_DINING_TIME, RESET_BUFFER_MINUTES } = require("../config/constants");
 const { getDurationMinutes, getResetReadyAtTimestamp, promoteNextWaitingBooking } = require("../utils/queueUtils");
 
@@ -60,28 +62,20 @@ function safeNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
-function getBookingStartTime(booking, fallback = new Date()) {
+function getBookingStartTime(booking, fallback = null) {
   if (!booking) {
     return fallback;
   }
 
+  // Use the actual seated time if available
   if (booking.seated_at) {
     return new Date(booking.seated_at);
   }
 
-  if (booking.booking_date && booking.booking_time) {
-    const bookingDate = new Date(booking.booking_date);
-    const yyyy = bookingDate.getFullYear();
-    const mm = String(bookingDate.getMonth() + 1).padStart(2, "0");
-    const dd = String(bookingDate.getDate()).padStart(2, "0");
-    const hhmm = String(booking.booking_time).slice(0, 5);
-    const composed = new Date(`${yyyy}-${mm}-${dd}T${hhmm}:00`);
-    if (!Number.isNaN(composed.getTime())) {
-      return composed;
-    }
-  }
-
-  return booking.created_at ? new Date(booking.created_at) : fallback;
+  // If not seated, don't fall back to booking time for "Seated since" tracking.
+  // This prevents the UI from showing a high "Seated since" duration 
+  // for a guest who was just promoted but hasn't physically sat down yet.
+  return fallback;
 }
 
 function computeExpectedCustomerFreeAt(booking, fallback = new Date()) {
@@ -89,12 +83,27 @@ function computeExpectedCustomerFreeAt(booking, fallback = new Date()) {
     return fallback;
   }
 
+  // Prefer the persisted expected_end_at (set by markBookingSeated / extendBookingExpectedEnd)
   if (booking.expected_end_at) {
     return new Date(booking.expected_end_at);
   }
 
+  // Fallback: estimate from seated_at (or booking scheduled time) + duration
+  // Duration is derived from the booking's OWN scheduled date+time so the day/hour
+  // profile (lunch/dinner/weekend) matches what was actually booked — not today's wall clock.
   const start = getBookingStartTime(booking, fallback);
-  const duration = getDurationMinutes(start, safeNumber(booking.guests, 2)) || AVG_DINING_TIME;
+
+  // Build a reference datetime from the booking's scheduled slot when available,
+  // so Saturday-night logic only fires for bookings actually made on Saturday night.
+  let durationRef = start;
+  if (booking.booking_date && booking.booking_time) {
+    const parsed = new Date(`${booking.booking_date}T${String(booking.booking_time).slice(0, 5)}:00`);
+    if (!Number.isNaN(parsed.getTime())) {
+      durationRef = parsed;
+    }
+  }
+
+  const duration = getDurationMinutes(durationRef, safeNumber(booking.guests, 2)) || AVG_DINING_TIME;
   return new Date(start.getTime() + duration * 60000);
 }
 
@@ -149,6 +158,18 @@ function formatDateOnlyLabel(value) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function format12HourTime(timeStr) {
+  if (!timeStr) return "-";
+  const parts = String(timeStr).split(':');
+  if (parts.length < 2) return timeStr;
+  let hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours.toString().padStart(2, '0')}:${minutes} ${ampm}`;
+}
+
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -188,6 +209,7 @@ function paginateRows(rows, requestedPage, perPage = 20) {
 
 function sortWaitingRows(rows, sortBy) {
   const cloned = [...rows];
+  const now = Date.now();
 
   switch (sortBy) {
     case "wait_desc":
@@ -196,22 +218,40 @@ function sortWaitingRows(rows, sortBy) {
         if (waitDiff !== 0) return waitDiff;
         return safeNumber(b.priority_score) - safeNumber(a.priority_score);
       });
+    case "excess_time_desc":
+      // Sort: VIP first, then ELDERLY, then STANDARD. Within same priority, most overdue first.
+      return cloned.sort((a, b) => {
+        const priorityDiff = safeNumber(b.priority_score) - safeNumber(a.priority_score);
+        if (priorityDiff !== 0) return priorityDiff;
+        const aWaitingTill = a.waitingTill ? new Date(a.waitingTill).getTime() : now;
+        const bWaitingTill = b.waitingTill ? new Date(b.waitingTill).getTime() : now;
+        const aExcess = Math.max(0, now - aWaitingTill);
+        const bExcess = Math.max(0, now - bWaitingTill);
+        return bExcess - aExcess; // most overdue first within same priority
+      });
     case "guest_asc":
       return cloned.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
     case "schedule_asc":
       return cloned.sort((a, b) => {
-        const aDate = new Date(`${formatDateOnlyLabel(a.booking_date)}T${String(a.booking_time).slice(0, 5)}:00`).getTime();
-        const bDate = new Date(`${formatDateOnlyLabel(b.booking_date)}T${String(b.booking_time).slice(0, 5)}:00`).getTime();
+        const aDate = a.waitingTill ? new Date(a.waitingTill).getTime() : 0;
+        const bDate = b.waitingTill ? new Date(b.waitingTill).getTime() : 0;
         return aDate - bDate;
       });
     case "priority_arrival":
     default:
       return cloned.sort((a, b) => {
+        const aExpiry = a.waitingTill ? new Date(a.waitingTill).getTime() : now;
+        const bExpiry = b.waitingTill ? new Date(b.waitingTill).getTime() : now;
+
+        const aOverdue = aExpiry <= now ? 0 : 1;
+        const bOverdue = bExpiry <= now ? 0 : 1;
+
+        if (aOverdue !== bOverdue) return aOverdue - bOverdue;
+
         const priorityDiff = safeNumber(b.priority_score) - safeNumber(a.priority_score);
         if (priorityDiff !== 0) return priorityDiff;
-        const aArrival = new Date(a.arrival_time).getTime();
-        const bArrival = new Date(b.arrival_time).getTime();
-        return aArrival - bArrival;
+
+        return aExpiry - bExpiry;
       });
   }
 }
@@ -246,7 +286,7 @@ async function renderAdminTablesPage(req, res, next) {
     const latestByTable = await getLatestConfirmedBookingsByTableIds(tables.map((table) => table.id));
     const bookingByTableId = new Map(latestByTable.map((row) => [Number(row.table_id), row]));
 
-    const tableCards = tables.map((table) => {
+    const tableCards = await Promise.all(tables.map(async (table) => {
       const activeBooking = bookingByTableId.get(Number(table.id)) || null;
       const resetReadyAt = table.reset_ready_at ? new Date(table.reset_ready_at) : null;
 
@@ -261,9 +301,23 @@ async function renderAdminTablesPage(req, res, next) {
       if (activeBooking) {
         customerName = activeBooking.name;
         customerPhone = activeBooking.phone;
+      }
+      
+      const isBuffer = table.status === "AVAILABLE" && resetReadyAt && resetReadyAt > now;
+      if (isBuffer) {
+        const nextInLine = await getNextQueueBookingForCapacity(table.capacity);
+        if (nextInLine) {
+          customerName = "Next: " + nextInLine.name;
+          customerPhone = "";
+        } else {
+          customerName = "Next: Pending...";
+          customerPhone = "";
+        }
+      }
 
-        const bookingStart = getBookingStartTime(activeBooking, now);
-        seatedSinceMinutes = minutesSince(bookingStart, now);
+      if (activeBooking && !isBuffer) {
+        const bookingStart = getBookingStartTime(activeBooking, null);
+        seatedSinceMinutes = bookingStart ? minutesSince(bookingStart, now) : null;
 
         customerFreeAt = computeExpectedCustomerFreeAt(activeBooking, now);
         timeUntilCustomerFree = minutesUntil(customerFreeAt, now);
@@ -287,7 +341,8 @@ async function renderAdminTablesPage(req, res, next) {
         customerName,
         customerPhone,
         seatedSinceMinutes,
-        seatedSinceLabel: seatedSinceMinutes === null ? "-" : formatRelativeMinutes(seatedSinceMinutes),
+        seatedSinceIso: activeBooking && !isBuffer && getBookingStartTime(activeBooking, null) ? getBookingStartTime(activeBooking, null).toISOString() : null,
+        seatedSinceLabel: seatedSinceMinutes === null ? (activeBooking && !isBuffer ? "Assigned (waiting to sit)" : "-") : formatRelativeMinutes(seatedSinceMinutes),
         customerFreeAtLabel: formatDateTimeLabel(customerFreeAt),
         tableFreeAtLabel: formatDateTimeLabel(tableFreeAt),
         timeUntilCustomerFree,
@@ -296,7 +351,7 @@ async function renderAdminTablesPage(req, res, next) {
         timeUntilTableFreeLabel: formatRelativeMinutes(timeUntilTableFree),
         resetInProgress: Boolean(resetReadyAt && resetReadyAt > now)
       };
-    });
+    }));
 
     res.render("admin-tables", {
       title: "Admin Tables",
@@ -320,7 +375,16 @@ async function renderAdminWaitingListPage(req, res, next) {
     const waitingRawRows = await Promise.all(
       queueRows.map(async (entry) => {
         const waitMinutes = safeNumber(entry.wait_time_minutes, 0);
-        const waitingTill = new Date(new Date(entry.arrival_time).getTime() + waitMinutes * 60000);
+
+        // Use booking_time as the base for both Schedule and Waiting Till so all columns are consistent.
+        // arrival_time (queue join time) != booking_time (reservation time) and caused +Xm excess to be wrong.
+        const [h, m] = String(entry.booking_time).split(':');
+        const dateStr = formatDateOnlyLabel(entry.booking_date); // "YYYY-MM-DD"
+        const baseScheduleMs = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`).getTime();
+        const scheduleDate = new Date(baseScheduleMs + waitMinutes * 60000);
+
+        // waitingTill = scheduleDate (same base), so "Waiting Till" and "Schedule" always match
+        const waitingTill = scheduleDate;
         const waitRemainingMinutes = minutesUntil(waitingTill, now);
         const candidateTables = await getAvailableTablesByCapacity(entry.guests || 1);
 
@@ -328,9 +392,11 @@ async function renderAdminWaitingListPage(req, res, next) {
           ...entry,
           waitingTill,
           waitRemainingMinutes,
-          waitRemainingLabel: formatRelativeMinutes(waitRemainingMinutes),
+          waitRemainingLabel: waitRemainingMinutes > 0
+            ? formatRelativeMinutes(waitRemainingMinutes)
+            : `0m (+${formatRelativeMinutes(minutesSince(waitingTill, now))})`,
           waitingTillLabel: formatDateTimeLabel(waitingTill),
-          scheduleLabel: `${formatDateOnlyLabel(entry.booking_date)} ${String(entry.booking_time).slice(0, 5)}`,
+          scheduleLabel: formatDateTimeLabel(scheduleDate),
           candidateTables,
           suggestedTableId: candidateTables.length ? candidateTables[0].id : null
         };
@@ -557,17 +623,24 @@ async function updateAdminTableStatus(req, res, next) {
 
     if (status === "AVAILABLE") {
       const resetReadyAt = getResetReadyAtTimestamp(new Date());
-      await updateTableStatus(tableId, "OCCUPIED");
+      // Retrieve current confirmed booking to mark as completed
+      const currentBookings = await getLatestConfirmedBookingsByTableIds([tableId]);
+      if (currentBookings.length > 0) {
+        await updateBookingStatus(currentBookings[0].id, "COMPLETED");
+      }
+      await updateTableStatus(tableId, "AVAILABLE");
       await setTableResetReadyAt(tableId, resetReadyAt);
+      broadcastUpdate();
       req.session.flash = {
         type: "info",
-        text: `Table ${tableId} marked for reset. Use Reset done when ready (${RESET_BUFFER_MINUTES} min buffer).`
+        text: `Table ${tableId} marked for reset. New customers will appear once reset is done.`
       };
       return res.redirect(returnTo);
     }
 
     await clearTableResetReadyAt(tableId);
     await updateTableStatus(tableId, "OCCUPIED");
+    broadcastUpdate();
     req.session.flash = { type: "warning", text: "Table marked as occupied." };
     return res.redirect(returnTo);
   } catch (error) {
@@ -584,6 +657,7 @@ async function resetDoneAdminTable(req, res, next) {
     await updateTableStatus(tableId, "AVAILABLE");
     const promotedId = await promoteNextWaitingBooking(tableId);
 
+    broadcastUpdate();
     req.session.flash = promotedId
       ? { type: "success", text: `Reset done. Waiting booking #${promotedId} was promoted.` }
       : { type: "success", text: "Reset done. Table is now available." };
@@ -598,7 +672,8 @@ async function completeAdminBooking(req, res, next) {
     const returnTo = resolveReturnTo(req, "/admin/waiting-list");
     const booking = await getBookingById(req.params.id);
     if (!booking) {
-      req.session.flash = { type: "danger", text: "Booking not found." };
+      broadcastUpdate();
+    req.session.flash = { type: "danger", text: "Booking not found." };
       return res.redirect(returnTo);
     }
 
@@ -606,11 +681,11 @@ async function completeAdminBooking(req, res, next) {
 
     if (booking.table_id) {
       const resetReadyAt = getResetReadyAtTimestamp(new Date());
-      await updateTableStatus(booking.table_id, "OCCUPIED");
+      await updateTableStatus(booking.table_id, "AVAILABLE");
       await setTableResetReadyAt(booking.table_id, resetReadyAt);
     }
-
-    req.session.flash = { type: "success", text: `Booking #${booking.id} completed.` };
+    broadcastUpdate();
+    req.session.flash = { type: "success", text: `Booking #${booking.id} completed. Table is being reset.` };
     return res.redirect(returnTo);
   } catch (error) {
     next(error);
@@ -622,12 +697,19 @@ async function seatNowAdminBooking(req, res, next) {
     const returnTo = resolveReturnTo(req, "/admin/waiting-list");
     const booking = await getBookingById(req.params.id);
     if (!booking) {
-      req.session.flash = { type: "danger", text: "Booking not found." };
+      broadcastUpdate();
+    req.session.flash = { type: "danger", text: "Booking not found." };
       return res.redirect(returnTo);
     }
 
     const seatedAt = new Date();
-    const duration = getDurationMinutes(seatedAt, booking.guests || 2) || AVG_DINING_TIME;
+    // Use the booking's scheduled date+time as the profile reference (not wall-clock now)
+    // so lunch/dinner/weekend profiles reflect when the booking was made, not the seating moment.
+    const bookingRefTime = (booking.booking_date && booking.booking_time)
+      ? new Date(`${booking.booking_date}T${String(booking.booking_time).slice(0, 5)}:00`)
+      : seatedAt;
+    const durationRef = Number.isNaN(bookingRefTime.getTime()) ? seatedAt : bookingRefTime;
+    const duration = getDurationMinutes(durationRef, booking.guests || 2) || AVG_DINING_TIME;
     const expectedEndAt = new Date(seatedAt.getTime() + duration * 60000);
 
     await markBookingSeated(booking.id, seatedAt, expectedEndAt);
@@ -643,7 +725,8 @@ async function extendAdminBooking(req, res, next) {
     const returnTo = resolveReturnTo(req, "/admin/waiting-list");
     const booking = await getBookingById(req.params.id);
     if (!booking) {
-      req.session.flash = { type: "danger", text: "Booking not found." };
+      broadcastUpdate();
+    req.session.flash = { type: "danger", text: "Booking not found." };
       return res.redirect(returnTo);
     }
 
@@ -653,13 +736,15 @@ async function extendAdminBooking(req, res, next) {
     if (booking.table_id) {
       const table = await getTableById(booking.table_id);
       if (table && Number(table.capacity) > 0) {
-        impactedCount = await addWaitingMinutesForCapacityPath(table.capacity, 15);
+        const impact = await addWaitingMinutesForEtaWindow({ capacity: table.capacity, addMinutes: 15, etaWindowMinutes: 20 });
+        impactedCount = impact.impactedTotal || 0;
       }
     }
 
+    broadcastUpdate();
     req.session.flash = {
       type: "info",
-      text: `Booking #${booking.id} extended by 15 minutes; updated ${impactedCount} waiting guest(s).`
+      text: `Booking #${booking.id} extended by 15 minutes; updated ${impactedCount} waiting guest(s) in 20-min ETA window.`
     };
     return res.redirect(returnTo);
   } catch (error) {
@@ -672,7 +757,8 @@ async function promoteAdminQueueBooking(req, res, next) {
     const booking = await getBookingById(req.params.bookingId);
 
     if (!booking || booking.status !== "WAITING") {
-      req.session.flash = { type: "danger", text: "Waiting booking not found." };
+      broadcastUpdate();
+    req.session.flash = { type: "danger", text: "Waiting booking not found." };
       return res.redirect(returnTo);
     }
 
@@ -702,7 +788,11 @@ async function promoteAdminQueueBooking(req, res, next) {
     await removeFromQueue(booking.id);
 
     const seatedAt = new Date();
-    const duration = getDurationMinutes(seatedAt, booking.guests || 2) || AVG_DINING_TIME;
+    const bookingRefTime2 = (booking.booking_date && booking.booking_time)
+      ? new Date(`${booking.booking_date}T${String(booking.booking_time).slice(0, 5)}:00`)
+      : seatedAt;
+    const durationRef2 = Number.isNaN(bookingRefTime2.getTime()) ? seatedAt : bookingRefTime2;
+    const duration = getDurationMinutes(durationRef2, booking.guests || 2) || AVG_DINING_TIME;
     const expectedEndAt = new Date(seatedAt.getTime() + duration * 60000);
     await markBookingSeated(booking.id, seatedAt, expectedEndAt);
 
@@ -710,6 +800,7 @@ async function promoteAdminQueueBooking(req, res, next) {
       type: "success",
       text: `Booking #${booking.id} seated at table ${selectedTable.id}.`
     };
+    broadcastUpdate();
     return res.redirect(returnTo);
   } catch (error) {
     next(error);
@@ -723,7 +814,8 @@ async function addAdminWaitingTime(req, res, next) {
     const booking = await getBookingById(req.params.bookingId);
 
     if (!booking || booking.status !== "WAITING") {
-      req.session.flash = { type: "danger", text: "Waiting booking not found." };
+      broadcastUpdate();
+    req.session.flash = { type: "danger", text: "Waiting booking not found." };
       return res.redirect(returnTo);
     }
 
@@ -735,6 +827,7 @@ async function addAdminWaitingTime(req, res, next) {
 
     await addWaitingMinutes(booking.id, minutes);
     req.session.flash = { type: "info", text: `Waiting time updated for booking #${booking.id} (+${minutes} min).` };
+    broadcastUpdate();
     return res.redirect(returnTo);
   } catch (error) {
     next(error);
@@ -791,6 +884,8 @@ module.exports = {
   toggleAdminMenuItem,
   updateAdminTableStatus
 };
+
+
 
 
 

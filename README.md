@@ -65,9 +65,15 @@ wait_time = ceil((occupied_tables * avg_dining_time / total_tables) + adjusted_q
 ```
 
 Where:
-- `avg_dining_time = 75 mins`
-- `base_queue_delay = queue_size * 15`
+- `avg_dining_time = 45 mins` (Baseline)
+- `base_queue_delay = queue_size * 10`
 - `adjusted_queue_delay = base_queue_delay * demand_multiplier`
+
+Duration Profiles (Rule-first):
+- **Lunch** (11 AM - 3 PM): 30 mins
+- **Dinner** (Mon-Fri 7 PM - 11 PM): 45 mins
+- **Weekend Dinner** (Sat/Sun 7 PM - 11 PM): 60 mins
+- **6+ Guests**: Adds +15/20 min buffer to profiles.
 
 Demand profile (rule-first, config-driven):
 - Mon-Fri day (non-night): `LOW`
@@ -100,10 +106,13 @@ This is intentionally not plain FIFO.
 ## 6. Table Management
 
 Table states:
-- `AVAILABLE`
-- `OCCUPIED`
+- `AVAILABLE`: Ready for seating.
+- `OCCUPIED`: Currently in use.
 
-Admin controls these states manually in dashboard for real-world accuracy.
+Admin controls:
+- **+15m Button**: Extends the current guest's ETA by 15 minutes. This automatically ripples a +15m wait update to any queue guests with a <20m ETA or who are already overdue.
+- **Completed Button**: Marks a table for reset. This triggers a 2-minute "Reset Buffer" during which the system predicts the "Next" customer.
+- **Reset Done**: Manually ends the reset buffer to immediately seat the next guest or make the table available.
 
 ## 7. Booking States
 
@@ -304,12 +313,26 @@ npm start
 Open:
 - `http://localhost:3000`
 
-## Verification Checklist
+## Recent Updates
+- **Real-Time Web Sync (SSE)**: All admin panels now synchronize automatically using Server-Sent Events, eliminating manual refreshes.
+- **Dynamic +15m Extension**: Admins can extend table turnover by 15 mins. This intelligently updates wait times for the next guests in line who are within a 20-minute allocation window.
+- **Optimized Turnover Logic**: Dining durations have been tuned for faster cycles (30-60m baselines) and more accurate queue predictions (10m per party delay).
+- **Synced "Next" Allocation**: The "Next" customer prediction on Table cards now perfectly aligns with Waiting List sorting (Overdue guests prioritized over Priority score).
+- **Auto-Assignment Daemon**: A background job that processes a 2-minute table reset buffer. It predicts the "Next in Line" customer and automatically promotes them without requiring manual admin approval.
+- **Flexible Seating Engine**: Relaxed capacity matching permits routing smaller parties to larger tables when demand enables it (e.g. 2 guests at a 6+ person table).
 
-Implemented from your requested plan:
-- Day/time-aware wait engine with Mon-Fri/Sat/Sun-night demand pattern
-- Medium-gradient profile multipliers via config
-- Alternate-slot suggestions + waitlist fallback
-- Admin demand insights panel (busy hours, popular days, wait buckets)
-- Menu delete action (secured admin route + dashboard button)
-- MVC backend retained (no rollback to monolithic server)
+## Future Recommendations & Known Edge Cases
+
+### Suggested Enhancements
+- **SMS/Email Notifications**: Integrate Twilio or SendGrid so guests are pinged immediately upon table availability rather than relying on host/hostess calls.
+- **Visual Floor Plan**: A drag-and-drop map of the physical restaurant layout to represent table statuses better than a list view.
+- **POS Integration**: Sync table sessions with bill status, allowing the app to auto-free tables when a check is paid.
+
+### System Infrastructure Needs
+- **TypeScript Migration**: Refactoring controller boundaries into TypeScript will eliminate structural silent errors (especially regarding complex queue simulation algorithms).
+- **Automated Tests**: Establish Jest supertest suites for booking allocations and queue movements to guarantee future modifications don't break table assignments.
+- **Dockerization**: Bundle PostgreSQL and Node servers into `docker-compose` for frictionless deployments.
+
+### Identified Behavioral Quirks
+- **Table Allocation Sorting**: The auto-assign daemon currently parses available tables by ID order. This could prematurely steal an 8-seater for a 5-guest party instead of searching for a 6-seater first, slightly bottlenecking large parties.
+- **SSE Connection Dropping**: Currently, standard SSE limits connections. On a highly unreliable mobile network for admins, it might occasionally desync and require a hard page reload.

@@ -26,8 +26,9 @@ function enrichTablesWithTimeLeft(tables, activeOccupancyRows) {
       return { ...table, timeLeftMinutes: AVG_DINING_TIME };
     }
 
-    const duration = getDurationMinutes(new Date(), Number(activeBooking.guests || table.capacity || 2));
     const bookingStart = new Date(`${activeBooking.booking_date.toISOString().slice(0, 10)}T${String(activeBooking.booking_time).slice(0, 5)}:00`);
+    const durationRef = Number.isNaN(bookingStart.getTime()) ? new Date() : bookingStart;
+    const duration = getDurationMinutes(durationRef, Number(activeBooking.guests || table.capacity || 2));
     const expectedEnd = activeBooking.expected_end_at
       ? new Date(activeBooking.expected_end_at).getTime()
       : bookingStart.getTime() + duration * 60000;

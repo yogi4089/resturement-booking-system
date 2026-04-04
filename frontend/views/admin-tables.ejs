@@ -37,9 +37,9 @@
           <div class="admin-table-meta">
             <p><small>Current guest</small><br><strong><%= table.customerName %></strong></p>
             <p><small>Phone</small><br><%= table.customerPhone %></p>
-            <p><small>Seated since</small><br><%= table.seatedSinceLabel %></p>
-            <p><small>Customer free in</small><br><%= table.timeUntilCustomerFreeLabel %> (<%= table.customerFreeAtLabel %>)</p>
-            <p><small>Table free in</small><br><%= table.timeUntilTableFreeLabel %> (<%= table.tableFreeAtLabel %>)</p>
+            <p><small>Seated since</small><br><span class="dynamic-since" data-time="<%= table.seatedSinceIso ? table.seatedSinceIso : '' %>"><%= table.seatedSinceLabel %></span></p>
+            <p><small>Customer free in</small><br><span class="dynamic-wait" data-time="<%= table.customerFreeAt ? table.customerFreeAt.toISOString() : '' %>"><%= table.timeUntilCustomerFreeLabel %></span> (<%= table.customerFreeAtLabel %>)</p>
+            <p><small>Table free in</small><br><span class="dynamic-wait" data-time="<%= table.tableFreeAt ? table.tableFreeAt.toISOString() : '' %>"><%= table.timeUntilTableFreeLabel %></span> (<%= table.tableFreeAtLabel %>)</p>
             <% if (table.resetInProgress) { %>
               <p><small>Reset buffer</small><br><span class="badge text-bg-secondary">In progress (~<%= resetBufferMinutes %> min policy)</span></p>
             <% } %>
@@ -50,13 +50,23 @@
               <input type="hidden" name="returnTo" value="/admin/tables">
               <button class="btn btn-sm btn-gold w-100" type="submit">Reset done</button>
             </form>
+          <% } else if (table.status === 'OCCUPIED' && table.activeBooking) { %>
+            <div class="d-flex gap-2 mt-3">
+              <form action="/admin/bookings/<%= table.activeBooking.id %>/extend" method="post" class="flex-grow-1">
+                <input type="hidden" name="returnTo" value="/admin/tables">
+                <button class="btn btn-sm btn-outline-light w-100" type="submit">+15m</button>
+              </form>
+              <form action="/admin/tables/<%= table.id %>/status" method="post" class="flex-grow-1">
+                <input type="hidden" name="returnTo" value="/admin/tables">
+                <input type="hidden" name="status" value="AVAILABLE">
+                <button class="btn btn-sm btn-gold w-100" type="submit">Completed</button>
+              </form>
+            </div>
           <% } else { %>
             <form action="/admin/tables/<%= table.id %>/status" method="post" class="w-100 mt-3">
               <input type="hidden" name="returnTo" value="/admin/tables">
-              <input type="hidden" name="status" value="<%= table.status === 'AVAILABLE' ? 'OCCUPIED' : 'AVAILABLE' %>">
-              <button class="btn btn-sm <%= table.status === 'AVAILABLE' ? 'btn-outline-light' : 'btn-gold' %> w-100" type="submit">
-                <%= table.status === 'AVAILABLE' ? 'Mark Occupied' : 'Mark Free (start reset)' %>
-              </button>
+              <input type="hidden" name="status" value="OCCUPIED">
+              <button class="btn btn-sm btn-outline-light w-100" type="submit">Mark Occupied</button>
             </form>
           <% } %>
         </article>
@@ -70,5 +80,46 @@
       <div class="footer-copy">Aurevo Dining House</div>
     </div>
   </footer>
+  <script>
+    function formatMins(mins) {
+      if (mins >= 60) {
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return m ? h + 'h ' + m + 'm' : h + 'h';
+      }
+      return mins + 'm';
+    }
+
+    function updateDynamicWaitTimes() {
+      const now = new Date();
+      document.querySelectorAll('.dynamic-wait').forEach(el => {
+        const timeAttr = el.dataset.time;
+        if (!timeAttr) return;
+        const targetTime = new Date(timeAttr);
+        const diffMs = now - targetTime;
+        if (diffMs > 0) {
+          const mins = Math.floor(diffMs / 60000);
+          el.textContent = '0m (+' + formatMins(mins) + ')';
+        } else {
+          const remains = Math.ceil(-diffMs / 60000);
+          el.textContent = formatMins(remains);
+        }
+      });
+
+      document.querySelectorAll('.dynamic-since').forEach(el => {
+        const timeAttr = el.dataset.time;
+        if (!timeAttr) return;
+        const targetTime = new Date(timeAttr);
+        const diffMs = now - targetTime;
+        if (diffMs >= 0) {
+          const mins = Math.floor(diffMs / 60000);
+          el.textContent = formatMins(mins);
+        }
+      });
+    }
+    setInterval(updateDynamicWaitTimes, 60000);
+    updateDynamicWaitTimes();
+  </script>
+  <%- include('partials/sse-client') %>
 </body>
 </html>

@@ -17,8 +17,10 @@ const {
 const {
   assignBookingToTable,
   getActiveOccupancyByTableIds,
+  getBookingById,
   getNoShowCandidates,
-  markBookingNoShow
+  markBookingNoShow,
+  markBookingSeated
 } = require("../models/bookingModel");
 const {
   clearTableResetReadyAt,
@@ -81,8 +83,8 @@ function formatFormLikeTime(date) {
 function getPartyBucket(partySize) {
   if (partySize <= 2) return "1-2";
   if (partySize <= 4) return "3-4";
-  if (partySize <= 6) return "5-6";
-  return "7+";
+  if (partySize === 5) return "5";
+  return "6+";
 }
 
 function getDurationMinutes(targetDateTime, partySize = 2) {
@@ -91,15 +93,15 @@ function getDurationMinutes(targetDateTime, partySize = 2) {
   const bucket = getPartyBucket(partySize);
 
   if (isNightHour(hour) && (day === 0 || day === 6)) {
-    return bucket === "7+" ? DURATION_PROFILES.WEEKEND_DINNER + 20 : DURATION_PROFILES.WEEKEND_DINNER;
+    return bucket === "6+" ? DURATION_PROFILES.WEEKEND_DINNER + 20 : DURATION_PROFILES.WEEKEND_DINNER;
   }
 
   if (isNightHour(hour)) {
-    return bucket === "7+" ? DURATION_PROFILES.DINNER + 15 : DURATION_PROFILES.DINNER;
+    return bucket === "6+" ? DURATION_PROFILES.DINNER + 15 : DURATION_PROFILES.DINNER;
   }
 
   if (hour >= 11 && hour <= 15) {
-    return bucket === "7+" ? DURATION_PROFILES.LUNCH + 15 : DURATION_PROFILES.LUNCH;
+    return bucket === "6+" ? DURATION_PROFILES.LUNCH + 15 : DURATION_PROFILES.LUNCH;
   }
 
   return DURATION_PROFILES.DEFAULT || AVG_DINING_TIME;
@@ -174,7 +176,7 @@ async function buildWaitEstimate(options = {}) {
 
     const safeTotalTables = Math.max(totalTables, 1);
     const baseTableDelay = (occupiedTables * AVG_DINING_TIME) / safeTotalTables;
-    const baseQueueDelay = queueCount * 15;
+    const baseQueueDelay = queueCount * 10;
     const queueDelay = baseQueueDelay * waitProfile.multiplier;
     const waitTime = Math.ceil(baseTableDelay + queueDelay);
 
@@ -212,15 +214,23 @@ async function buildWaitEstimate(options = {}) {
   const occupancyByTable = new Map(occupancyRows.map((row) => [Number(row.table_id), row]));
 
   const durationUsed = getDurationMinutes(targetDateTime, partySize);
-  const freeTimes = eligibleTables.map((table) => computeTableFreeAt(table, occupancyByTable, targetDateTime, durationUsed));
+  const freeTimesDates = eligibleTables.map((table) => computeTableFreeAt(table, occupancyByTable, targetDateTime, durationUsed));
 
-  const earliestFree = freeTimes.length
-    ? new Date(Math.min(...freeTimes.map((slot) => slot.getTime())))
-    : new Date(targetDateTime.getTime() + durationUsed * 60000);
+  const freeTimes = freeTimesDates.map((d) => d.getTime());
+  if (freeTimes.length === 0) {
+    freeTimes.push(targetDateTime.getTime() + durationUsed * 60000);
+  }
 
-  const queueCycles = Math.floor(queueAhead / eligibleTableCount);
-  const additionalFromQueue = queueCycles * durationUsed;
-  const queueAdjustedSlot = new Date(earliestFree.getTime() + additionalFromQueue * 60000);
+  const earliestFree = new Date(Math.min(...freeTimes));
+
+  for (let i = 0; i < queueAhead; i++) {
+    freeTimes.sort((a, b) => a - b);
+    freeTimes[0] += durationUsed * 60000;
+  }
+  freeTimes.sort((a, b) => a - b);
+  const queueAdjustedSlot = new Date(freeTimes[0]);
+
+  const additionalFromQueue = Math.max(0, (queueAdjustedSlot.getTime() - earliestFree.getTime()) / 60000);
 
   const rawMinutes = Math.max(0, Math.ceil((queueAdjustedSlot.getTime() - targetDateTime.getTime()) / 60000));
   const adjustedMinutes = Math.ceil(rawMinutes * waitProfile.multiplier);
@@ -265,6 +275,17 @@ async function promoteNextWaitingBooking(tableId) {
   await updateTableStatus(tableId, "OCCUPIED");
   await removeFromQueue(queueItem.booking_id);
 
+  const seatedAt = new Date();
+  const fullBooking = await getBookingById(queueItem.booking_id);
+  const bookingRefTime = (fullBooking && fullBooking.booking_date && fullBooking.booking_time)
+    ? new Date(`${fullBooking.booking_date}T${String(fullBooking.booking_time).slice(0, 5)}:00`)
+    : seatedAt;
+  const durationRef = Number.isNaN(bookingRefTime.getTime()) ? seatedAt : bookingRefTime;
+  
+  const duration = getDurationMinutes(durationRef, queueItem.guests || 2) || AVG_DINING_TIME;
+  const expectedEndAt = new Date(seatedAt.getTime() + duration * 60000);
+  await markBookingSeated(queueItem.booking_id, seatedAt, expectedEndAt);
+
   return queueItem.booking_id;
 }
 
@@ -294,7 +315,30 @@ function getResetReadyAtTimestamp(fromDate = new Date()) {
   return new Date(fromDate.getTime() + RESET_BUFFER_MINUTES * 60000);
 }
 
+
+async function autoAssignReadyTables() {
+  const { broadcastUpdate } = require('./sse');
+  const { query } = require('../config/db');
+  
+  // Find tables that are AVAILABLE and whose reset buffer has expired
+  const res = await query("SELECT id FROM tables WHERE status = 'AVAILABLE' AND reset_ready_at <= NOW()");
+  if (res.rows.length === 0) return;
+
+  let assigned = false;
+  for (const row of res.rows) {
+    const promotedId = await promoteNextWaitingBooking(row.id);
+    if (promotedId) {
+      assigned = true;
+    }
+  }
+  
+  if (assigned) {
+    broadcastUpdate();
+  }
+}
+
 module.exports = {
+  autoAssignReadyTables,
   buildAlternativeSlots,
   buildWaitEstimate,
   getDurationMinutes,
