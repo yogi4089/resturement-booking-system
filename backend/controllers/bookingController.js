@@ -19,6 +19,33 @@ const { formatTime, parseBookingDateTime } = require("../utils/timeUtils");
 const { AVG_DINING_TIME } = require("../config/constants");
 const { broadcastAlert } = require("../utils/sse");
 
+async function getBaseHomeData() {
+  const [menuItems, tables, waitEstimate] = await Promise.all([
+    getAvailableMenuItems(),
+    getTableInventory(),
+    buildWaitEstimate()
+  ]);
+  const activeOccupancyRows = await getActiveOccupancyByTableIds(tables.map((t) => t.id));
+  const tablesWithTimeLeft = enrichTablesWithTimeLeft(tables, activeOccupancyRows);
+
+  const now = new Date();
+  const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  
+  return {
+    menuItems,
+    tables: tablesWithTimeLeft,
+    waitEstimate,
+    avgDiningTime: AVG_DINING_TIME,
+    queueCount: waitEstimate.components.queueCount,
+    queueAhead: waitEstimate.components.queueAhead,
+    defaultBookingDate: localNow.toISOString().slice(0, 10),
+    defaultBookingTime: localNow.toISOString().slice(11, 16),
+    defaultBookingDayName: localNow.toLocaleDateString("en-IN", { weekday: "long" }),
+    slotOffer: null,
+    title: "Reserve a Table"
+  };
+}
+
 function enrichTablesWithTimeLeft(tables, activeOccupancyRows) {
   const nowMs = Date.now();
   const occupancyByTable = new Map(activeOccupancyRows.map((row) => [Number(row.table_id), row]));
@@ -50,6 +77,19 @@ function enrichTablesWithTimeLeft(tables, activeOccupancyRows) {
 
 async function createBooking(req, res, next) {
   try {
+    const now = new Date();
+    const currentHour = now.getHours();
+    
+    // Stop taking entries between 00:00 (12 at night) and 08:00 (8 early morning)
+    if (currentHour >= 0 && currentHour < 8) {
+      return res.status(403).render("home", {
+        ...(await getBaseHomeData()),
+        title: "Bookings Closed",
+        bookingRestricted: true,
+        restrictedMessage: "Our online booking system is open daily from 08:00 AM to 12:00 AM. Please visit us during these hours."
+      });
+    }
+
     const { name, phone, booking_date, booking_time, guests, priority } = req.body;
     const guestCount = Number(guests);
     const bookingDateTime = parseBookingDateTime(booking_date, booking_time);
@@ -206,30 +246,10 @@ async function addBookingToWaitingList({ req, res, bookingInput, bookingDateTime
 }
 
 async function renderHomeWithOffer({ req, res, formData, waitEstimate, alternatives }) {
-  const now = new Date();
-  const localNow = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-  const defaultBookingDate = localNow.toISOString().slice(0, 10);
-  const defaultBookingTime = localNow.toISOString().slice(11, 16);
-  const defaultBookingDayName = localNow.toLocaleDateString("en-IN", { weekday: "long" });
-
-  const [menuItems, tables] = await Promise.all([
-    getAvailableMenuItems(),
-    getTableInventory()
-  ]);
-  const activeOccupancyRows = await getActiveOccupancyByTableIds(tables.map((table) => table.id));
-  const tablesWithTimeLeft = enrichTablesWithTimeLeft(tables, activeOccupancyRows);
-
+  const baseData = await getBaseHomeData();
+  
   return res.status(409).render("home", {
-    title: "Reserve a Table",
-    menuItems,
-    tables: tablesWithTimeLeft,
-    avgDiningTime: AVG_DINING_TIME,
-    waitEstimate,
-    queueCount: waitEstimate.components.queueCount,
-    queueAhead: waitEstimate.components.queueAhead,
-    defaultBookingDate,
-    defaultBookingTime,
-    defaultBookingDayName,
+    ...baseData,
     slotOffer: {
       formData,
       waitEstimate,

@@ -116,12 +116,12 @@ function minutesSince(targetDate, now = new Date()) {
 }
 
 function formatRelativeMinutes(minutes) {
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins ? `${hours}h ${mins}m` : `${hours}h`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours > 0) {
+    return `${hours}h ${mins}m`;
   }
-  return `${minutes}m`;
+  return `${mins}m`;
 }
 
 function formatDateTimeLabel(value) {

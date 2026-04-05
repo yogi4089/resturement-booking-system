@@ -88,11 +88,17 @@ async function renderMenuPage(req, res, next) {
 async function renderStatusPage(req, res, next) {
   try {
     const { booking: bookingId } = req.query;
-    const booking = bookingId ? await getBookingWithAssignedTable(bookingId) : null;
+    const [booking, tables, waitEstimate] = await Promise.all([
+      bookingId ? getBookingWithAssignedTable(bookingId) : null,
+      getTableInventory(),
+      buildWaitEstimate()
+    ]);
 
     res.render("status", {
       title: "Booking Status",
-      booking
+      booking,
+      tables,
+      waitEstimate
     });
   } catch (error) {
     next(error);
@@ -101,10 +107,17 @@ async function renderStatusPage(req, res, next) {
 
 async function findBookingStatus(req, res, next) {
   try {
-    const booking = await getLatestBookingByPhone(req.body.phone);
+    const [booking, tables, waitEstimate] = await Promise.all([
+      getLatestBookingByPhone(req.body.phone),
+      getTableInventory(),
+      buildWaitEstimate()
+    ]);
+
     res.render("status", {
       title: "Booking Status",
-      booking
+      booking,
+      tables,
+      waitEstimate
     });
   } catch (error) {
     next(error);

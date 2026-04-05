@@ -11,17 +11,7 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="page-shell">
-  <header class="topbar">
-    <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3 py-3">
-      <a class="brand-mark text-decoration-none" href="/"><span class="brand-script">Aurevo</span><span class="brand-sub">Dining House</span></a>
-      <nav class="nav nav-pills luxury-nav">
-        <a class="nav-link" href="/">Booking</a>
-        <a class="nav-link" href="/menu">Menu</a>
-        <a class="nav-link" href="/status">Status</a>
-        <a class="nav-link" href="/admin/login">Admin</a>
-      </nav>
-    </div>
-  </header>
+  <%- include('partials/navbar', { activeTab: 'menu' }) %>
   <section class="subpage-hero">
     <div class="container subpage-copy">
       <p class="eyebrow">Curated Menu</p>

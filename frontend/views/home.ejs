@@ -11,20 +11,7 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="page-shell">
-  <header class="topbar">
-    <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3 py-3">
-      <a class="brand-mark text-decoration-none" href="/">
-        <span class="brand-script">Aurevo</span>
-        <span class="brand-sub">Dining House</span>
-      </a>
-      <nav class="nav nav-pills luxury-nav">
-        <a class="nav-link" href="/">Booking</a>
-        <a class="nav-link" href="/menu">Menu</a>
-        <a class="nav-link" href="/status">Status</a>
-        <a class="nav-link" href="/admin/login">Admin</a>
-      </nav>
-    </div>
-  </header>
+  <%- include('partials/navbar', { activeTab: 'booking' }) %>
   <% if (flash) { %>
     <div class="container mt-3">
       <div class="alert alert-<%= flash.type %> shadow-sm"><%= flash.text %></div>
@@ -163,6 +150,25 @@
           <input type="hidden" name="booking_time" value="<%= slotOffer.formData.booking_time %>">
           <button class="btn btn-outline-light" type="submit">Join waiting list instead</button>
         </form>
+      </article>
+    </dialog>
+  <% } %>
+
+  <% if (typeof bookingRestricted !== 'undefined' && bookingRestricted) { %>
+    <dialog id="restrictionModal" class="luxury-modal">
+      <article class="support-card luxury-modal-card">
+        <div class="luxury-modal-actions">
+          <button class="btn btn-outline-light btn-sm" id="closeRestrictionModal" type="button">Close</button>
+        </div>
+        <div class="panel-header text-center">
+          <span class="panel-kicker">System Closed</span>
+          <h2>Bookings Paused</h2>
+          <p class="mt-3"><%= restrictedMessage %></p>
+        </div>
+        <div class="mt-4 text-center">
+          <p class="text-muted small">Our digital doors reopen at 08:00 AM. We look forward to seeing you then.</p>
+          <a href="/" class="btn btn-gold mt-3">Back to Home</a>
+        </div>
       </article>
     </dialog>
   <% } %>
@@ -399,27 +405,49 @@
       renderCalendar();
 
       <% if (slotOffer) { %>
-      const slotOfferDialog = document.getElementById('slotOfferDialog');
-      const closeSlotOfferDialog = document.getElementById('closeSlotOfferDialog');
-      if (slotOfferDialog) {
-        if (typeof slotOfferDialog.showModal === 'function') {
-          slotOfferDialog.showModal();
-        } else {
-          slotOfferDialog.setAttribute('open', 'open');
-        }
+      (function() {
+        const slotOfferDialog = document.getElementById('slotOfferDialog');
+        const closeSlotOfferDialog = document.getElementById('closeSlotOfferDialog');
+        if (slotOfferDialog) {
+          if (typeof slotOfferDialog.showModal === 'function') {
+            slotOfferDialog.showModal();
+          } else {
+            slotOfferDialog.setAttribute('open', 'open');
+          }
 
-        if (closeSlotOfferDialog) {
-          closeSlotOfferDialog.addEventListener('click', function () {
-            slotOfferDialog.close();
+          if (closeSlotOfferDialog) {
+            closeSlotOfferDialog.addEventListener('click', function () {
+              slotOfferDialog.close();
+            });
+          }
+
+          slotOfferDialog.addEventListener('click', function (event) {
+            if (event.target === slotOfferDialog) {
+              slotOfferDialog.close();
+            }
           });
         }
+      })();
+      <% } %>
 
-        slotOfferDialog.addEventListener('click', function (event) {
-          if (event.target === slotOfferDialog) {
-            slotOfferDialog.close();
+      <% if (typeof bookingRestricted !== 'undefined' && bookingRestricted) { %>
+      (function() {
+        const restrictionModal = document.getElementById('restrictionModal');
+        const closeRestrictionModal = document.getElementById('closeRestrictionModal');
+        if (restrictionModal) {
+          if (typeof restrictionModal.showModal === 'function') {
+            restrictionModal.showModal();
+          } else {
+            restrictionModal.setAttribute('open', 'open');
           }
-        });
-      }
+
+          if (closeRestrictionModal) {
+            closeRestrictionModal.addEventListener('click', function () {
+              restrictionModal.close();
+            });
+          }
+        }
+      })();
       <% } %>
     })();
   </script>

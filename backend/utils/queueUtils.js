@@ -294,7 +294,16 @@ function buildAlternativeSlots(waitEstimate, count = 4) {
   const slotList = [];
 
   for (let index = 0; index < count; index += 1) {
-    const slotDate = new Date(base.getTime() + index * 30 * 60000);
+    let slotDate = new Date(base.getTime() + index * 30 * 60000);
+    
+    // Enforce 08:00 - 24:00 window
+    const hour = slotDate.getHours();
+    if (hour < 8) {
+      // If a slot is calculated to be between 00:00 and 07:59, 
+      // push it to 08:00 AM of that SAME day (since 00:00 is technically "next day")
+      slotDate.setHours(8, 0, 0, 0);
+    }
+
     const weekday = slotDate.toLocaleDateString("en-IN", { weekday: "long" });
     const weekdayShort = slotDate.toLocaleDateString("en-IN", { weekday: "short" });
 

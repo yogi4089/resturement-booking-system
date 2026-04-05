@@ -1,0 +1,36 @@
+<header class="topbar <%= (typeof isAdmin !== 'undefined' && isAdmin) ? 'admin-topbar' : 'user-topbar' %>">
+  <div class="container d-flex flex-wrap align-items-center gap-3 py-3">
+    <a class="brand-mark text-decoration-none" href="/">
+      <span class="brand-script">Aurevo</span>
+      <span class="brand-sub">Dining House</span>
+    </a>
+    <nav class="nav nav-pills luxury-nav <%= (typeof isAdmin !== 'undefined' && isAdmin) ? 'admin-luxury-nav' : '' %>">
+      <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+        <a class="nav-link <%= activeTab === 'tables' ? 'active' : '' %>" href="/admin/tables">Tables</a>
+        <a class="nav-link <%= activeTab === 'waiting-list' ? 'active' : '' %>" href="/admin/waiting-list">Waiting List</a>
+        <a class="nav-link <%= activeTab === 'menu' ? 'active' : '' %>" href="/admin/menu">Menu</a>
+        <a class="nav-link <%= activeTab === 'insights' ? 'active' : '' %>" href="/admin/insights">Insights</a>
+      <% } else { %>
+        <a class="nav-link <%= activeTab === 'booking' ? 'active' : '' %>" href="/">Booking</a>
+        <a class="nav-link <%= activeTab === 'menu' ? 'active' : '' %>" href="/menu">Menu</a>
+        <a class="nav-link <%= activeTab === 'status' ? 'active' : '' %>" href="/status">Status</a>
+        <a class="nav-link" href="/admin/login">Admin</a>
+      <% } %>
+    </nav>
+    <% if (typeof isAdmin !== 'undefined' && isAdmin) { %>
+      <div class="alert-tray ms-auto" id="alertTray">
+        <button class="alert-bell" id="alertBellBtn" onclick="toggleAlertPanel()" title="Notifications">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16"><path d="M8 16a2 2 0 0 0 2-2H6a2 2 0 0 0 2 2zm.995-14.901a1 1 0 1 0-1.99 0A5.002 5.002 0 0 0 3 6c0 1.098-.5 6-2 7h14c-1.5-1-2-5.902-2-7 0-2.42-1.72-4.44-4.005-4.901z"/></svg>
+          <span class="alert-badge" id="alertBadge" style="display:none">0</span>
+        </button>
+        <div class="alert-panel" id="alertPanel" style="display:none">
+          <div class="alert-panel-header"><span>Live Alerts</span><button onclick="clearAlerts()" class="alert-clear-btn">Clear</button></div>
+          <div class="alert-list" id="alertList"><div class="alert-empty">No alerts yet</div></div>
+        </div>
+      </div>
+      <form action="/admin/logout" method="post" class="admin-nav-logout">
+        <button class="admin-logout-link" type="submit">Logout</button>
+      </form>
+    <% } %>
+  </div>
+</header>

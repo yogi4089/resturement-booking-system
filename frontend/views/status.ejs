@@ -66,7 +66,11 @@
               <div><span>Date</span><strong><%= booking.booking_date.toISOString().slice(0, 10) %></strong></div>
               <div><span>Time</span><strong><%= booking.booking_time.toString().slice(0, 5) %></strong></div>
               <div><span>Table</span><strong><%= booking.assigned_table || "Waiting" %></strong></div>
-              <div><span>Estimated wait</span><strong><%= booking.wait_time_minutes || 0 %> mins</strong></div>
+              <div><span>Estimated wait</span><strong><% 
+                const wt = booking.wait_time_minutes || 0;
+                const hh = Math.floor(wt / 60);
+                const mm = wt % 60;
+                %><%= hh > 0 ? `${hh}h ${mm}m` : `${mm}m` %></strong></div>
             </div>
             <% if (booking.status !== "CANCELLED" && booking.status !== "COMPLETED") { %>
               <form action="/bookings/<%= booking.id %>/cancel" method="post" class="mt-4">
