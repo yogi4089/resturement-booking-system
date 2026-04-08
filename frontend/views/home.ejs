@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -23,18 +23,17 @@
         <p class="eyebrow">Dark Luxury Reservation Suite</p>
         <h1>Reserve the evening before the room fills.</h1>
         <p class="lead">Manage premium table bookings, smart waitlisting, and live table readiness in one smooth flow.</p>
-        <p class="hero-note">Built for hosts who need confidence at the door and guests who want immediate clarity on their evening.</p>
         <div class="hero-stats">
-          <div><span>Current wait</span><strong><%= waitEstimate.waitTime %> mins</strong></div>
-          <div><span>Suggested next slot</span><strong><%= waitEstimate.nextSlot.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) %></strong></div>
+          <div><span>Current wait</span><strong><% if (Math.floor(waitEstimate.waitTime / 60) > 0) { %><%= Math.floor(waitEstimate.waitTime / 60) %>h <% } %><%= waitEstimate.waitTime % 60 %>m</strong></div>
+          <div><span>Suggested next slot</span><strong><%= waitEstimate.nextSlot.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false }) %></strong></div>
           <div><span>Current profile</span><strong><%= waitEstimate.waitProfile %></strong></div>
         </div>
       </div>
       <div class="reservation-panel">
         <div class="panel-header">
           <span class="panel-kicker">Book a Table</span>
-          <h2>Request a curated seating slot</h2>
-          <p>Fast guest capture with immediate confirmation or premium queue placement.</p>
+          <h2>Request a guranted seating slot</h2>
+          <p> Premium Guest Booking with Fast-Track Access.</p>
         </div>
         <form action="/bookings" method="post" class="row g-3">
           <div class="col-md-6">
@@ -72,7 +71,7 @@
           <div class="col-md-6">
             <label class="form-label">Time</label>
             <input class="form-control luxury-input" type="time" name="booking_time" value="<%= slotOffer ? slotOffer.formData.booking_time : defaultBookingTime %>" placeholder="HH:MM" required>
-            <small class="text-light-emphasis">Use time like HH:MM (example: 07:30)</small>
+            <small class="text-light-emphasis">Use time in  HH:MM (07:30)</small>
           </div>
           <div class="col-md-6">
             <label class="form-label">Guests</label>
@@ -98,12 +97,12 @@
     <dialog id="slotOfferDialog" class="luxury-modal">
       <article class="support-card luxury-modal-card">
         <div class="luxury-modal-actions">
-          <button class="btn btn-outline-light btn-sm" id="closeSlotOfferDialog" type="button">Close</button>
+          <button class="btn-close-luxury" id="closeSlotOfferDialog" type="button" aria-label="Close">&times;</button>
         </div>
         <div class="panel-header">
           <span class="panel-kicker">Alternative Slots</span>
           <h2>No matching table right now</h2>
-          <p>Estimated wait: <strong>~<%= slotOffer.waitEstimate.waitTime %> mins</strong> (range <%= slotOffer.waitEstimate.waitRange.min %>-<%= slotOffer.waitEstimate.waitRange.max %> mins, <%= slotOffer.waitEstimate.waitProfile %>, x<%= slotOffer.waitEstimate.multiplier %>).</p>
+          <p>Estimated wait: <strong>~<% if (Math.floor(slotOffer.waitEstimate.waitTime / 60) > 0) { %><%= Math.floor(slotOffer.waitEstimate.waitTime / 60) %>h <% } %><%= slotOffer.waitEstimate.waitTime % 60 %>m</strong> (range <%= slotOffer.waitEstimate.waitRange.min %>-<%= slotOffer.waitEstimate.waitRange.max %> mins, <%= slotOffer.waitEstimate.waitProfile %>, x<%= slotOffer.waitEstimate.multiplier %>).</p>
           <p>Customers ahead for your party size: <strong><%= slotOffer.waitEstimate.components.queueAhead %></strong>. Earliest eligible slot: <strong><%= slotOffer.waitEstimate.earliestEligibleSlot.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) %></strong>.</p>
         </div>
         <div class="alt-slot-grid">
@@ -137,7 +136,7 @@
               <input class="form-control luxury-input" type="time" name="booking_time" value="<%= slotOffer.formData.booking_time %>" placeholder="HH:MM" required>
             </div>
             <div class="col-md-4">
-              <button class="btn btn-outline-light w-100" type="submit">Update time & check again</button>
+              <button class="btn btn-outline-gold w-100" type="submit">Update time & check again</button>
             </div>
           </form>
         </div>
@@ -148,7 +147,7 @@
           <input type="hidden" name="priority" value="<%= slotOffer.formData.priority %>">
           <input type="hidden" name="booking_date" value="<%= slotOffer.formData.booking_date %>">
           <input type="hidden" name="booking_time" value="<%= slotOffer.formData.booking_time %>">
-          <button class="btn btn-outline-light" type="submit">Join waiting list instead</button>
+          <button class="btn btn-outline-gold" type="submit">Join waiting list instead</button>
         </form>
       </article>
     </dialog>
@@ -158,7 +157,7 @@
     <dialog id="restrictionModal" class="luxury-modal">
       <article class="support-card luxury-modal-card">
         <div class="luxury-modal-actions">
-          <button class="btn btn-outline-light btn-sm" id="closeRestrictionModal" type="button">Close</button>
+          <button class="btn-close-luxury" id="closeRestrictionModal" type="button" aria-label="Close">&times;</button>
         </div>
         <div class="panel-header text-center">
           <span class="panel-kicker">System Closed</span>
@@ -187,7 +186,6 @@
         <p class="eyebrow">Tables</p>
         <h2>Room readiness at a glance</h2>
       </div>
-      <p class="subpage-note">Manual table control keeps the floor plan realistic during busy service.</p>
     </div>
     <div class="table-grid">
       <% tables.forEach((table) => { %>
@@ -195,9 +193,10 @@
           <span>Table <%= table.id %></span>
           <strong><%= table.capacity %> seats</strong>
           <em><%= table.status %></em>
-          <% if (table.status === 'OCCUPIED') { %>
-            <small>Approx <%= Math.floor(table.timeLeftMinutes / 60) > 0 ? `${Math.floor(table.timeLeftMinutes / 60)}h ${table.timeLeftMinutes % 60}m` : `${table.timeLeftMinutes}m` %> until free</small>
-            <span class="badge rounded-pill text-bg-warning">Queue <%= queueCount %></span>
+          <% if (table.bucketQueue > 0) { %>
+            <div class="mt-2 text-center">
+              <span class="badge rounded-pill text-bg-warning px-3 py-2">Queue <%= table.bucketQueue %></span>
+            </div>
           <% } %>
         </div>
       <% }) %>
@@ -210,7 +209,6 @@
         <p class="eyebrow">Quick Dishes</p>
         <h2>Recommended during longer waits</h2>
       </div>
-      <p class="subpage-note">Use the public menu to keep waiting guests engaged with quick-turn options.</p>
     </div>
     <div class="menu-preview">
       <% menuItems.slice(0, 3).forEach((item) => { %>
@@ -226,7 +224,7 @@
   <footer class="luxury-footer">
     <div class="container">
       <div class="footer-copy">Priority queueing, clear status tracking, and a premium front-desk flow for modern restaurants.</div>
-      <div class="footer-copy">Aurevo Dining House</div>
+      <div class="footer-copy">Aurevo Dining House\\ <span>@yogi</span></div>
     </div>
   </footer>
   <script>

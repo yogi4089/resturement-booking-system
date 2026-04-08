@@ -82,15 +82,31 @@ async function createBooking(req, res, next) {
     
     // Stop taking entries between 00:00 (12 at night) and 08:00 (8 early morning)
     if (currentHour >= 0 && currentHour < 8) {
+      let restrictedMessage = "Our online system is open daily from 08:00 AM to 12:00 AM. Access will reopen in the morning at 08:00 AM.";
+      if (currentHour >= 0 && currentHour < 2) {
+        restrictedMessage = "Booking closed for today. Our online system will reopen at 08:00 AM.";
+      }
       return res.status(403).render("home", {
         ...(await getBaseHomeData()),
         title: "Bookings Closed",
         bookingRestricted: true,
-        restrictedMessage: "Our online booking system is open daily from 08:00 AM to 12:00 AM. Please visit us during these hours."
+        restrictedMessage: restrictedMessage
       });
     }
 
     const { name, phone, booking_date, booking_time, guests, priority } = req.body;
+    const bookingHour = parseInt(booking_time.split(':')[0], 10);
+
+    // Validate requested slot is between 08:00 AM and 12:00 AM
+    if (bookingHour >= 0 && bookingHour < 8) {
+      return res.status(403).render("home", {
+        ...(await getBaseHomeData()),
+        title: "Slot Unavailable",
+        bookingRestricted: true,
+        restrictedMessage: "Bookings are only available for time slots between 08:00 AM and 12:00 AM."
+      });
+    }
+
     const guestCount = Number(guests);
     const bookingDateTime = parseBookingDateTime(booking_date, booking_time);
     const table = await getAvailableTable(guestCount);

@@ -37,7 +37,7 @@
           <div class="admin-table-meta">
             <p><small>Current guest</small><br><strong><%= table.customerName %></strong></p>
             <p><small>Phone</small><br><%= table.customerPhone %></p>
-            <p><small>Seated since</small><br><span class="dynamic-since" data-time="<%= table.seatedSinceIso ? table.seatedSinceIso : '' %>"><%= table.seatedSinceLabel %></span></p>
+            <p><small><%= table.seatedSinceIso ? 'Seated since' : 'Status' %></small><br><span class="dynamic-since" data-time="<%= table.seatedSinceIso ? table.seatedSinceIso : '' %>"><%= table.seatedSinceLabel %></span></p>
             <p><small>Customer free in</small><br><span class="dynamic-wait" data-time="<%= table.customerFreeAt ? table.customerFreeAt.toISOString() : '' %>"><%= table.timeUntilCustomerFreeLabel %></span> (<%= table.customerFreeAtLabel %>)</p>
             <p><small>Table free in</small><br><span class="dynamic-wait" data-time="<%= table.tableFreeAt ? table.tableFreeAt.toISOString() : '' %>"><%= table.timeUntilTableFreeLabel %></span> (<%= table.tableFreeAtLabel %>)</p>
             <% if (table.resetInProgress) { %>
@@ -54,7 +54,13 @@
             <div class="d-flex gap-2 mt-3">
               <form action="/admin/bookings/<%= table.activeBooking.id %>/extend" method="post" class="flex-grow-1">
                 <input type="hidden" name="returnTo" value="/admin/tables">
-                <button class="btn btn-sm btn-outline-light w-100" type="submit">+15m</button>
+                <input type="hidden" name="minutes" value="10">
+                <button class="btn btn-sm btn-outline-gold w-100" type="submit">+10m</button>
+              </form>
+              <form action="/admin/bookings/<%= table.activeBooking.id %>/extend" method="post" class="flex-grow-1">
+                <input type="hidden" name="returnTo" value="/admin/tables">
+                <input type="hidden" name="minutes" value="15">
+                <button class="btn btn-sm btn-outline-gold w-100" type="submit">+15m</button>
               </form>
               <form action="/admin/tables/<%= table.id %>/status" method="post" class="flex-grow-1">
                 <input type="hidden" name="returnTo" value="/admin/tables">
@@ -66,7 +72,7 @@
             <form action="/admin/tables/<%= table.id %>/status" method="post" class="w-100 mt-3">
               <input type="hidden" name="returnTo" value="/admin/tables">
               <input type="hidden" name="status" value="OCCUPIED">
-              <button class="btn btn-sm btn-outline-light w-100" type="submit">Mark Occupied</button>
+              <button class="btn btn-sm btn-gold w-100" type="submit">Mark Occupied</button>
             </form>
           <% } %>
         </article>

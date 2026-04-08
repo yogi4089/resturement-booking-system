@@ -29,7 +29,6 @@
     <div class="container subpage-copy">
       <p class="eyebrow">Waiting List</p>
       <h1>Control queue decisions and current floor occupancy.</h1>
-      <p class="subpage-note">Seat from queue with suggested table preselected, and monitor all occupied tables in one page.</p>
       <p class="subpage-note"><%= recommendedSort %></p>
     </div>
   </section>
@@ -118,17 +117,17 @@
                     </form>
                   <% } else { %>
                     <div class="admin-no-table-actions">
-                      <button class="btn btn-outline-light btn-sm w-100 mb-2" type="button" disabled>All Tables Occupied</button>
+                      <button class="btn btn-outline-gold btn-sm w-100 mb-2" type="button" disabled>All Tables Occupied</button>
                       <div class="d-flex gap-2">
                         <form action="/admin/queue/<%= row.booking_id %>/wait/add" method="post">
                           <input type="hidden" name="returnTo" value="<%= waitingReturnTo %>">
                           <input type="hidden" name="minutes" value="10">
-                          <button class="btn btn-outline-light btn-sm" type="submit">+10m</button>
+                          <button class="btn btn-outline-gold btn-sm" type="submit">+10m</button>
                         </form>
                         <form action="/admin/queue/<%= row.booking_id %>/wait/add" method="post">
                           <input type="hidden" name="returnTo" value="<%= waitingReturnTo %>">
                           <input type="hidden" name="minutes" value="15">
-                          <button class="btn btn-outline-light btn-sm" type="submit">+15m</button>
+                          <button class="btn btn-outline-gold btn-sm" type="submit">+15m</button>
                         </form>
                       </div>
                     </div>
@@ -144,13 +143,13 @@
         <span>Page <%= waitingMeta.currentPage %> of <%= waitingMeta.totalPages %></span>
         <div class="admin-pagination-links">
           <% if (waitingMeta.hasPrev) { %>
-            <a class="btn btn-outline-light btn-sm" href="<%= buildHref(waitingControls.baseQuery, 'wPage', waitingMeta.prevPage) %>">Previous</a>
+            <a class="pagination-link" href="<%= buildHref(waitingControls.baseQuery, 'wPage', waitingMeta.prevPage) %>">Prev</a>
           <% } %>
           <% waitingMeta.pageNumbers.forEach((pageNumber) => { %>
-            <a class="btn btn-sm <%= pageNumber === waitingMeta.currentPage ? 'btn-gold' : 'btn-outline-light' %>" href="<%= buildHref(waitingControls.baseQuery, 'wPage', pageNumber) %>"><%= pageNumber %></a>
+            <a class="pagination-link <%= pageNumber === waitingMeta.currentPage ? 'is-active' : '' %>" href="<%= buildHref(waitingControls.baseQuery, 'wPage', pageNumber) %>"><%= pageNumber %></a>
           <% }) %>
           <% if (waitingMeta.hasNext) { %>
-            <a class="btn btn-outline-light btn-sm" href="<%= buildHref(waitingControls.baseQuery, 'wPage', waitingMeta.nextPage) %>">Next</a>
+            <a class="pagination-link" href="<%= buildHref(waitingControls.baseQuery, 'wPage', waitingMeta.nextPage) %>">Next</a>
           <% } %>
         </div>
       </div>
@@ -229,17 +228,17 @@
                     </form>
                   <% } else { %>
                     <div class="admin-no-table-actions">
-                      <button class="btn btn-outline-light btn-sm w-100 mb-2" type="button" disabled>All Tables Occupied</button>
+                      <button class="btn btn-outline-gold btn-sm w-100 mb-2" type="button" disabled>All Tables Occupied</button>
                       <div class="d-flex gap-2">
                         <form action="/admin/queue/<%= row.booking_id %>/wait/add" method="post">
                           <input type="hidden" name="returnTo" value="<%= readyReturnTo %>">
                           <input type="hidden" name="minutes" value="10">
-                          <button class="btn btn-outline-light btn-sm" type="submit">+10m</button>
+                          <button class="btn btn-outline-gold btn-sm" type="submit">+10m</button>
                         </form>
                         <form action="/admin/queue/<%= row.booking_id %>/wait/add" method="post">
                           <input type="hidden" name="returnTo" value="<%= readyReturnTo %>">
                           <input type="hidden" name="minutes" value="15">
-                          <button class="btn btn-outline-light btn-sm" type="submit">+15m</button>
+                          <button class="btn btn-outline-gold btn-sm" type="submit">+15m</button>
                         </form>
                       </div>
                     </div>
@@ -255,13 +254,13 @@
         <span>Page <%= readyMeta.currentPage %> of <%= readyMeta.totalPages %></span>
         <div class="admin-pagination-links">
           <% if (readyMeta.hasPrev) { %>
-            <a class="btn btn-outline-light btn-sm" href="<%= buildHref(readyControls.baseQuery, 'rPage', readyMeta.prevPage) %>">Previous</a>
+            <a class="pagination-link" href="<%= buildHref(readyControls.baseQuery, 'rPage', readyMeta.prevPage) %>">Prev</a>
           <% } %>
           <% readyMeta.pageNumbers.forEach((pageNumber) => { %>
-            <a class="btn btn-sm <%= pageNumber === readyMeta.currentPage ? 'btn-gold' : 'btn-outline-light' %>" href="<%= buildHref(readyControls.baseQuery, 'rPage', pageNumber) %>"><%= pageNumber %></a>
+            <a class="pagination-link <%= pageNumber === readyMeta.currentPage ? 'is-active' : '' %>" href="<%= buildHref(readyControls.baseQuery, 'rPage', pageNumber) %>"><%= pageNumber %></a>
           <% }) %>
           <% if (readyMeta.hasNext) { %>
-            <a class="btn btn-outline-light btn-sm" href="<%= buildHref(readyControls.baseQuery, 'rPage', readyMeta.nextPage) %>">Next</a>
+            <a class="pagination-link" href="<%= buildHref(readyControls.baseQuery, 'rPage', readyMeta.nextPage) %>">Next</a>
           <% } %>
         </div>
       </div>
@@ -323,11 +322,11 @@
                   <div class="d-flex gap-2 flex-wrap admin-booked-actions">
                     <form action="/admin/bookings/<%= row.booking.id %>/extend" method="post">
                       <input type="hidden" name="returnTo" value="<%= bookedReturnTo %>">
-                      <button class="btn btn-outline-light btn-sm" type="submit">Extend +15m</button>
+                      <button class="btn btn-outline-gold btn-sm" type="submit">Extend +15m</button>
                     </form>
                     <form action="/admin/bookings/<%= row.booking.id %>/complete" method="post">
                       <input type="hidden" name="returnTo" value="<%= bookedReturnTo %>">
-                      <button class="btn btn-outline-light btn-sm" type="submit">Complete</button>
+                      <button class="btn btn-gold btn-sm" type="submit">Complete</button>
                     </form>
                   </div>
                 </td>
@@ -341,13 +340,13 @@
         <span>Page <%= bookedMeta.currentPage %> of <%= bookedMeta.totalPages %></span>
         <div class="admin-pagination-links">
           <% if (bookedMeta.hasPrev) { %>
-            <a class="btn btn-outline-light btn-sm" href="<%= buildHref(bookedControls.baseQuery, 'bPage', bookedMeta.prevPage) %>">Previous</a>
+            <a class="pagination-link" href="<%= buildHref(bookedControls.baseQuery, 'bPage', bookedMeta.prevPage) %>">Prev</a>
           <% } %>
           <% bookedMeta.pageNumbers.forEach((pageNumber) => { %>
-            <a class="btn btn-sm <%= pageNumber === bookedMeta.currentPage ? 'btn-gold' : 'btn-outline-light' %>" href="<%= buildHref(bookedControls.baseQuery, 'bPage', pageNumber) %>"><%= pageNumber %></a>
+            <a class="pagination-link <%= pageNumber === bookedMeta.currentPage ? 'is-active' : '' %>" href="<%= buildHref(bookedControls.baseQuery, 'bPage', pageNumber) %>"><%= pageNumber %></a>
           <% }) %>
           <% if (bookedMeta.hasNext) { %>
-            <a class="btn btn-outline-light btn-sm" href="<%= buildHref(bookedControls.baseQuery, 'bPage', bookedMeta.nextPage) %>">Next</a>
+            <a class="pagination-link" href="<%= buildHref(bookedControls.baseQuery, 'bPage', bookedMeta.nextPage) %>">Next</a>
           <% } %>
         </div>
       </div>

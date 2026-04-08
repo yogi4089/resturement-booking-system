@@ -35,7 +35,7 @@
         <p class="subpage-note">A tighter command center for busy shifts, queue decisions, and real-world table updates.</p>
       </div>
       <form action="/admin/logout" method="post">
-        <button class="btn btn-outline-light" type="submit">Logout</button>
+        <button class="btn btn-outline-gold" type="submit">Logout</button>
       </form>
     </div>
   </section>
@@ -117,12 +117,17 @@
                 <form action="/admin/tables/<%= table.id %>/reset-done" method="post" class="w-100 mt-3">
                   <button class="btn btn-sm btn-gold w-100" type="submit">Reset done</button>
                 </form>
-              <% } else { %>
               <% } else if (table.status === 'OCCUPIED' && table.activeBookingId) { %>
                 <div class="d-flex gap-2 mt-3">
                   <form action="/admin/bookings/<%= table.activeBookingId %>/extend" method="post" class="flex-grow-1">
                     <input type="hidden" name="returnTo" value="/admin">
-                    <button class="btn btn-sm btn-outline-light w-100" type="submit">+15m</button>
+                    <input type="hidden" name="minutes" value="10">
+                    <button class="btn btn-sm btn-outline-gold w-100" type="submit">+10m</button>
+                  </form>
+                  <form action="/admin/bookings/<%= table.activeBookingId %>/extend" method="post" class="flex-grow-1">
+                    <input type="hidden" name="returnTo" value="/admin">
+                    <input type="hidden" name="minutes" value="15">
+                    <button class="btn btn-sm btn-outline-gold w-100" type="submit">+15m</button>
                   </form>
                   <form action="/admin/tables/<%= table.id %>/status" method="post" class="flex-grow-1">
                     <input type="hidden" name="status" value="AVAILABLE">
@@ -132,7 +137,7 @@
               <% } else { %>
                 <form action="/admin/tables/<%= table.id %>/status" method="post" class="w-100 mt-3">
                   <input type="hidden" name="status" value="<%= table.status === 'AVAILABLE' ? 'OCCUPIED' : 'AVAILABLE' %>">
-                  <button class="btn btn-sm <%= table.status === 'AVAILABLE' ? 'btn-outline-light' : 'btn-gold' %> w-100" type="submit"><%= table.status === 'AVAILABLE' ? 'Mark Occupied' : 'Completed' %></button>
+                  <button class="btn btn-sm <%= table.status === 'AVAILABLE' ? 'btn-gold' : 'btn-gold' %> w-100" type="submit"><%= table.status === 'AVAILABLE' ? 'Mark Occupied' : 'Completed' %></button>
                 </form>
               <% } %>
             </div>
@@ -200,15 +205,15 @@
                     <div class="d-flex gap-2 flex-wrap">
                       <% if (booking.status === "CONFIRMED" && !booking.seated_at) { %>
                         <form action="/admin/bookings/<%= booking.id %>/seat" method="post">
-                          <button class="btn btn-outline-light btn-sm" type="submit">Seat now</button>
+                          <button class="btn btn-gold btn-sm" type="submit">Seat now</button>
                         </form>
                       <% } %>
                       <% if (booking.status === "CONFIRMED") { %>
                         <form action="/admin/bookings/<%= booking.id %>/extend" method="post">
-                          <button class="btn btn-outline-light btn-sm" type="submit">Extend +15m</button>
+                          <button class="btn btn-outline-gold btn-sm" type="submit">Extend +15m</button>
                         </form>
                         <form action="/admin/bookings/<%= booking.id %>/complete" method="post">
-                          <button class="btn btn-outline-light btn-sm" type="submit">Complete</button>
+                          <button class="btn btn-gold btn-sm" type="submit">Complete</button>
                         </form>
                       <% } %>
                     </div>
@@ -240,10 +245,10 @@
               </div>
               <div class="d-flex gap-2 flex-wrap">
                 <form action="/admin/menu/<%= item.id %>/toggle" method="post">
-                  <button class="btn btn-outline-light btn-sm" type="submit">Toggle</button>
+                  <button class="btn btn-outline-gold btn-sm" type="submit">Toggle</button>
                 </form>
                 <form action="/admin/menu/<%= item.id %>/delete" method="post" onsubmit="return confirm('Delete this menu item permanently?');">
-                  <button class="btn btn-outline-light btn-sm" type="submit">Delete</button>
+                  <button class="btn btn-outline-gold btn-sm" type="submit">Delete</button>
                 </form>
               </div>
             </article>

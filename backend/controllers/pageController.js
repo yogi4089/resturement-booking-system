@@ -4,7 +4,8 @@ const {
   getBookingWithAssignedTable,
   getLatestBookingByPhone,
   getTableInventory,
-  getActiveOccupancyByTableIds
+  getActiveOccupancyByTableIds,
+  getQueueSizeByBucket
 } = require("../models");
 const { AVG_DINING_TIME } = require("../config/constants");
 const { buildWaitEstimate, getDurationMinutes } = require("../utils/queueUtils");
@@ -46,19 +47,56 @@ async function renderHomePage(req, res, next) {
     const defaultBookingTime = localNow.toISOString().slice(11, 16);
     const defaultBookingDayName = localNow.toLocaleDateString("en-IN", { weekday: "long" });
 
-    const [menuItems, tables, waitEstimate] = await Promise.all([
+    const [menuItems, tables, waitEstimate, queueBuckets] = await Promise.all([
       getAvailableMenuItems(),
       getTableInventory(),
-      buildWaitEstimate()
+      buildWaitEstimate(),
+      getQueueSizeByBucket()
     ]);
 
     const activeOccupancyRows = await getActiveOccupancyByTableIds(tables.map((table) => table.id));
     const tablesWithTimeLeft = enrichTablesWithTimeLeft(tables, activeOccupancyRows);
 
+    const bucketMap = {};
+    queueBuckets.forEach(b => { bucketMap[b.party_bucket] = b.count; });
+
+    // Create a tracker for distributed queues per table ID
+    const tableQueues = {};
+    tablesWithTimeLeft.forEach(t => tableQueues[t.id] = 0);
+
+    // Distribute parties realistically based on overlapping capacity logic
+    const bucketsToProcess = ['1-2', '3-4', '5-6', '7+'];
+    bucketsToProcess.forEach(bucket => {
+       const count = bucketMap[bucket] || 0;
+       
+       // Filter tables that can accommodate this bucket size
+       const eligibleTables = tablesWithTimeLeft.filter(t => {
+          const cap = t.capacity;
+          if (bucket === '1-2') return cap >= 2 && cap <= 4;
+          if (bucket === '3-4') return cap >= 4 && cap <= 6;
+          if (bucket === '5-6') return cap >= 6 && cap <= 8;
+          if (bucket === '7+') return cap >= 8;
+          return false;
+       });
+
+       // Round-robin distribute the queue to ideally balance load
+       if (eligibleTables.length > 0) {
+          for (let i = 0; i < count; i++) {
+             // Always give to the eligible table that currently has the lowest queue
+             eligibleTables.sort((a, b) => tableQueues[a.id] - tableQueues[b.id]);
+             tableQueues[eligibleTables[0].id] += 1;
+          }
+       }
+    });
+
+    const tablesWithQueue = tablesWithTimeLeft.map(t => {
+       return { ...t, bucketQueue: tableQueues[t.id] || 0 };
+    });
+
     res.render("home", {
       title: "Reserve a Table",
       menuItems,
-      tables: tablesWithTimeLeft,
+      tables: tablesWithQueue,
       avgDiningTime: AVG_DINING_TIME,
       waitEstimate,
       queueCount: waitEstimate.components.queueCount,

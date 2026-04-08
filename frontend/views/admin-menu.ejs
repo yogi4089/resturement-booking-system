@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+ï»¿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -47,14 +47,14 @@
           <article class="list-card">
             <div>
               <h3><%= item.name %></h3>
-              <p>Rs. <%= Number(item.price).toFixed(0) %> · <%= item.availability ? "Available" : "Unavailable" %></p>
+              <p>Rs. <%= Number(item.price).toFixed(0) %> &middot; <%= item.availability ? "Available" : "Unavailable" %></p>
             </div>
             <div class="d-flex gap-2 flex-wrap">
               <form action="/admin/menu/<%= item.id %>/toggle" method="post">
-                <button class="btn btn-outline-light btn-sm" type="submit">Toggle</button>
+                <button class="btn btn-outline-gold btn-sm" type="submit">Toggle</button>
               </form>
               <form action="/admin/menu/<%= item.id %>/delete" method="post" onsubmit="return confirm('Delete this menu item permanently?');">
-                <button class="btn btn-outline-light btn-sm" type="submit">Delete</button>
+                <button class="btn btn-outline-gold btn-sm" type="submit">Delete</button>
               </form>
             </div>
           </article>

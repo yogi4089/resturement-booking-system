@@ -236,6 +236,12 @@ async function buildWaitEstimate(options = {}) {
   const adjustedMinutes = Math.ceil(rawMinutes * waitProfile.multiplier);
   const buffer = Math.max(10, Math.ceil(adjustedMinutes * 0.2));
 
+  // Enforce 08:00 - 24:00 window for the earliest eligible slot
+  const earliestEligibleSlot = queueAdjustedSlot;
+  if (earliestEligibleSlot.getHours() < 8) {
+    earliestEligibleSlot.setHours(8, 0, 0, 0);
+  }
+
   return {
     waitTime: adjustedMinutes,
     waitRange: {
@@ -243,7 +249,7 @@ async function buildWaitEstimate(options = {}) {
       max: adjustedMinutes + buffer
     },
     nextSlot: new Date(targetDateTime.getTime() + adjustedMinutes * 60000),
-    earliestEligibleSlot: queueAdjustedSlot,
+    earliestEligibleSlot,
     waitProfile: waitProfile.label,
     multiplier: waitProfile.multiplier,
     durationUsed,
@@ -300,8 +306,12 @@ function buildAlternativeSlots(waitEstimate, count = 4) {
     const hour = slotDate.getHours();
     if (hour < 8) {
       // If a slot is calculated to be between 00:00 and 07:59, 
-      // push it to 08:00 AM of that SAME day (since 00:00 is technically "next day")
+      // push it to 08:00 AM of that SAME day (next day in timeline)
       slotDate.setHours(8, 0, 0, 0);
+    } else if (hour >= 24) {
+       // Theoretically handled by Date object rollover, but ensuring 08:00 AM start
+       slotDate.setDate(slotDate.getDate() + 1);
+       slotDate.setHours(8, 0, 0, 0);
     }
 
     const weekday = slotDate.toLocaleDateString("en-IN", { weekday: "long" });

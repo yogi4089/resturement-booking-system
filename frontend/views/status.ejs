@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -11,17 +11,7 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body class="page-shell">
-  <header class="topbar">
-    <div class="container d-flex flex-wrap align-items-center justify-content-between gap-3 py-3">
-      <a class="brand-mark text-decoration-none" href="/"><span class="brand-script">Aurevo</span><span class="brand-sub">Dining House</span></a>
-      <nav class="nav nav-pills luxury-nav">
-        <a class="nav-link" href="/">Booking</a>
-        <a class="nav-link" href="/menu">Menu</a>
-        <a class="nav-link" href="/status">Status</a>
-        <a class="nav-link" href="/admin/login">Admin</a>
-      </nav>
-    </div>
-  </header>
+  <%- include('partials/navbar', { activeTab: 'status' }) %>
   <% if (flash) { %>
     <div class="container mt-3">
       <div class="alert alert-<%= flash.type %> shadow-sm"><%= flash.text %></div>
@@ -31,7 +21,7 @@
     <div class="container subpage-copy">
       <p class="eyebrow">Status Tracker</p>
       <h1>Check your latest booking by phone number.</h1>
-      <p class="subpage-note">Guests get a calm, clear status view for confirmed tables, waiting positions, and current estimated wait.</p>
+      <p class="subpage-note">Clear, elegant status updates for bookings, waitlist position, and expected wait time.</p>
     </div>
   </section>
   <% if (booking && booking.status === "CONFIRMED") { %>
@@ -40,8 +30,8 @@
     </section>
   <% } %>
   <section class="container pb-5">
-    <div class="status-shell two-column">
-      <div class="status-shell">
+    <div class="status-grid-main">
+      <div class="status-main-col">
         <form action="/status" method="post" class="reservation-panel compact">
           <div class="panel-header">
             <span class="panel-kicker">Find Booking</span>
@@ -74,7 +64,7 @@
             </div>
             <% if (booking.status !== "CANCELLED" && booking.status !== "COMPLETED") { %>
               <form action="/bookings/<%= booking.id %>/cancel" method="post" class="mt-4">
-                <button class="btn btn-outline-light" type="submit">Cancel booking</button>
+                <button class="btn btn-outline-gold" type="submit">Cancel booking</button>
               </form>
             <% } %>
           </article>
@@ -85,24 +75,32 @@
           </div>
         <% } %>
       </div>
-      <aside class="support-card">
-        <div class="panel-header">
-          <span class="panel-kicker">Guest Support</span>
-          <h2>What this page helps with</h2>
-        </div>
-        <ul class="support-list">
-          <li>Check whether the booking is confirmed or waiting.</li>
-          <li>Review table assignment when a table has already been allocated.</li>
-          <li>See the latest estimated wait time for queue entries.</li>
-          <li>Cancel an active booking if plans change.</li>
-        </ul>
-      </aside>
+      
+      <div class="status-side-col">
+        <aside class="support-card mb-4">
+          <div class="panel-header">
+            <span class="panel-kicker">Guest Support</span>
+            <h2>What this page helps with</h2>
+          </div>
+          <ul class="support-list">
+            <li>Check whether the booking is confirmed or waiting.</li>
+            <li>Review table assignment when a table has already been allocated.</li>
+            <li>See the latest estimated wait time for queue entries.</li>
+            <li>Cancel an active booking if plans change.</li>
+          </ul>
+        </aside>
+
+        <!-- Dynamic Floor Plan -->
+        
+      </div>
     </div>
   </section>
+
+  <script src="/sse-client.ejs"></script>
   <footer class="luxury-footer">
     <div class="container">
       <div class="footer-copy">A composed guest-facing experience reduces front-desk confusion and repeated status calls.</div>
-      <div class="footer-copy">Aurevo Dining House</div>
+      <div class="footer-copy">Aurevo Dining House \\ @yogi </div>
     </div>
   </footer>
 </body>
