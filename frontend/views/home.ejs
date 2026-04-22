@@ -126,7 +126,7 @@
   <% } %>
 
   <% if (slotOffer) { %>
-    <dialog id="slotOfferDialog" class="luxury-modal">
+    <dialog id="slotOfferDialog" class="luxury-modal luxury-modal-wide">
       <article class="support-card luxury-modal-card">
         <div class="luxury-modal-actions">
           <button class="btn-close-luxury" id="closeSlotOfferDialog" type="button" aria-label="Close">&times;</button>
@@ -134,10 +134,10 @@
         <div class="panel-header">
           <span class="panel-kicker">Alternative Slots</span>
           <h2>No matching table right now</h2>
-          <p>Estimated wait: <strong>~<% if (Math.floor(slotOffer.waitEstimate.waitTime / 60) > 0) { %><%= Math.floor(slotOffer.waitEstimate.waitTime / 60) %>h <% } %><%= slotOffer.waitEstimate.waitTime % 60 %>m</strong> (range <%= slotOffer.waitEstimate.waitRange.min %>-<%= slotOffer.waitEstimate.waitRange.max %> mins, <%= slotOffer.waitEstimate.waitProfile %>, x<%= slotOffer.waitEstimate.multiplier %>).</p>
+          <p class="mb-2">Estimated wait: <strong>~<% if (Math.floor(slotOffer.waitEstimate.waitTime / 60) > 0) { %><%= Math.floor(slotOffer.waitEstimate.waitTime / 60) %>h <% } %><%= slotOffer.waitEstimate.waitTime % 60 %>m</strong> (range <%= slotOffer.waitEstimate.waitRange.min %>-<%= slotOffer.waitEstimate.waitRange.max %> mins, <%= slotOffer.waitEstimate.waitProfile %>, x<%= slotOffer.waitEstimate.multiplier %>).</p>
           <p>Customers ahead for your party size: <strong><%= slotOffer.waitEstimate.components.queueAhead %></strong>. Earliest eligible slot: <strong><%= slotOffer.waitEstimate.earliestEligibleSlot.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) %></strong>.</p>
         </div>
-        <div class="alt-slot-grid">
+        <div class="alt-slot-row">
           <% slotOffer.alternatives.forEach((slot) => { %>
             <form action="/bookings/alternative" method="post" class="alt-slot-card">
               <input type="hidden" name="name" value="<%= slotOffer.formData.name %>">
@@ -146,8 +146,10 @@
               <input type="hidden" name="priority" value="<%= slotOffer.formData.priority %>">
               <input type="hidden" name="booking_date" value="<%= slot.bookingDate %>">
               <input type="hidden" name="booking_time" value="<%= slot.bookingTime %>">
-              <h3><%= slot.weekdayShort %>, <%= slot.formattedTime %></h3>
-              <p><%= slot.formattedDate %> (<%= slot.weekday %>) at <%= slot.formattedTime %></p>
+              <div class="alt-slot-info">
+                <h3><%= slot.weekdayShort %>, <%= slot.formattedTime %></h3>
+                <p><%= slot.formattedDate %> (<%= slot.weekday %>) at <%= slot.formattedTime %></p>
+              </div>
               <button class="btn btn-gold w-100" type="submit">Book this slot</button>
             </form>
           <% }) %>
@@ -516,18 +518,3 @@
   </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

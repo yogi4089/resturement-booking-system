@@ -560,46 +560,59 @@ body {
 
 .menu-side { text-align: right; }
 .status-shell,
-.list-stack { display: grid; gap: 1rem; }
-
-.alt-slot-grid,
+.list-stack,
+.alt-slot-row,
 .demand-grid {
   display: grid;
   gap: 1rem;
 }
 
-.alt-slot-grid {
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+.alt-slot-row {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-bottom: 2rem;
+  padding-bottom: 0.35rem;
 }
 
 .alt-slot-card {
-  padding: 1rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(214, 180, 104, 0.24);
-  background: linear-gradient(180deg, rgba(44, 32, 22, 0.95), rgba(25, 20, 15, 0.95));
-  display: grid;
-  gap: 0.5rem;
+  flex: 0 0 220px;
+  padding: 1.25rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(214, 180, 104, 0.2);
+  background: linear-gradient(180deg, #1d1711, #14100b);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 180px;
 }
 
-.alt-slot-card h3 {
+.alt-slot-info h3 {
   margin: 0;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
+  color: var(--text);
 }
 
-.alt-slot-card p {
+.alt-slot-info p {
   color: var(--muted);
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .luxury-modal {
-  width: min(440px, calc(100vw - 2rem));
+  width: min(460px, calc(100vw - 2rem));
   max-height: calc(100vh - 2rem);
   padding: 0;
   border: 1px solid rgba(214, 180, 104, 0.26);
   border-radius: 1.25rem;
   background: transparent;
   color: var(--text);
+}
+
+.luxury-modal.luxury-modal-wide {
+  width: min(1280px, calc(100vw - 2rem));
 }
 
 .luxury-modal::backdrop {
@@ -1767,8 +1780,8 @@ pre { white-space: pre-wrap; color: var(--gold-soft); }
   }
 
   /* Alt slots modal */
-  .alt-slot-grid {
-    grid-template-columns: 1fr;
+  .alt-slot-row {
+    gap: 0.75rem;
   }
 
   /* Luxury modal */
