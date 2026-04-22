@@ -36,5 +36,50 @@
         <div class="admin-tools-placeholder" style="min-width: 180px;"></div>
       <% } %>
     </div>
+    <% if (typeof isAdmin === 'undefined' || !isAdmin) { %>
+      <button class="nav-hamburger" id="navHamburger" aria-label="Open menu" aria-expanded="false">
+        <span></span>
+      </button>
+    <% } %>
   </div>
 </header>
+
+<% if (typeof isAdmin === 'undefined' || !isAdmin) { %>
+<div class="mobile-nav-drawer" id="mobileNavDrawer" role="dialog" aria-modal="true" aria-label="Navigation">
+  <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
+  <div class="mobile-nav-panel">
+    <button class="mobile-nav-close" id="mobileNavClose" aria-label="Close menu">&times;</button>
+    <nav class="mobile-nav-links">
+      <a href="/" class="<%= activeTab === 'booking' ? 'active' : '' %>">Booking</a>
+      <a href="/menu" class="<%= activeTab === 'menu' ? 'active' : '' %>">Menu</a>
+      <a href="/status" class="<%= activeTab === 'status' ? 'active' : '' %>">Status</a>
+      <a href="/admin/login">Admin</a>
+    </nav>
+  </div>
+</div>
+<script>
+(function () {
+  var btn = document.getElementById('navHamburger');
+  var drawer = document.getElementById('mobileNavDrawer');
+  var overlay = document.getElementById('mobileNavOverlay');
+  var closeBtn = document.getElementById('mobileNavClose');
+  if (!btn || !drawer) return;
+  function openDrawer() {
+    drawer.classList.add('is-open');
+    btn.classList.add('is-open');
+    btn.setAttribute('aria-expanded', 'true');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeDrawer() {
+    drawer.classList.remove('is-open');
+    btn.classList.remove('is-open');
+    btn.setAttribute('aria-expanded', 'false');
+    document.body.style.overflow = '';
+  }
+  btn.addEventListener('click', openDrawer);
+  if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
+  if (overlay) overlay.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeDrawer(); });
+})();
+</script>
+<% } %>
