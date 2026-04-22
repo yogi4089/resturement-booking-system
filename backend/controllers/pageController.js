@@ -104,6 +104,7 @@ async function renderHomePage(req, res, next) {
       defaultBookingDate,
       defaultBookingTime,
       defaultBookingDayName,
+      availabilityOffer: null,
       slotOffer: null
     });
   } catch (error) {

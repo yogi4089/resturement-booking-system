@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %> | Aurevo Dining</title>
+  <title><%= title %> | Family Dining</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
@@ -92,6 +92,39 @@
       </div>
     </div>
   </section>
+
+  <% if (availabilityOffer) { %>
+    <dialog id="availabilityDialog" class="luxury-modal">
+      <article class="support-card luxury-modal-card">
+        <div class="luxury-modal-actions">
+          <button class="btn-close-luxury" id="closeAvailabilityDialog" type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="panel-header">
+          <span class="panel-kicker">Table Available</span>
+          <h2>Your requested slot is available</h2>
+          <p>Review your booking details and confirm to book instantly.</p>
+        </div>
+        <div class="status-grid mb-3">
+          <div><span>Name</span><strong><%= availabilityOffer.formData.name %></strong></div>
+          <div><span>Phone</span><strong><%= availabilityOffer.formData.phone %></strong></div>
+          <div><span>Guests</span><strong><%= availabilityOffer.formData.guests %></strong></div>
+          <div><span>Date</span><strong><%= availabilityOffer.formData.booking_date %></strong></div>
+          <div><span>Time</span><strong><%= availabilityOffer.formData.booking_time %></strong></div>
+          <div><span>Table</span><strong>Table <%= availabilityOffer.table.id %> (<%= availabilityOffer.table.capacity %> seats)</strong></div>
+        </div>
+        <form action="/bookings/confirm" method="post" class="d-flex flex-wrap gap-2">
+          <input type="hidden" name="name" value="<%= availabilityOffer.formData.name %>">
+          <input type="hidden" name="phone" value="<%= availabilityOffer.formData.phone %>">
+          <input type="hidden" name="guests" value="<%= availabilityOffer.formData.guests %>">
+          <input type="hidden" name="priority" value="<%= availabilityOffer.formData.priority %>">
+          <input type="hidden" name="booking_date" value="<%= availabilityOffer.formData.booking_date %>">
+          <input type="hidden" name="booking_time" value="<%= availabilityOffer.formData.booking_time %>">
+          <button class="btn btn-gold" type="submit">Book this table</button>
+          <button class="btn btn-outline-gold" id="keepExploringButton" type="button">Keep exploring slots</button>
+        </form>
+      </article>
+    </dialog>
+  <% } %>
 
   <% if (slotOffer) { %>
     <dialog id="slotOfferDialog" class="luxury-modal">
@@ -224,7 +257,7 @@
   <footer class="luxury-footer">
     <div class="container">
       <div class="footer-copy">Priority queueing, clear status tracking, and a premium front-desk flow for modern restaurants.</div>
-      <div class="footer-copy">Aurevo Dining House\\ <span>@yogi</span></div>
+      <div class="footer-copy">Family Dining House\\ <span>@yogi</span></div>
     </div>
   </footer>
   <script>
@@ -401,6 +434,39 @@
 
       refreshDisplay();
       renderCalendar();
+
+      <% if (availabilityOffer) { %>
+      (function() {
+        const availabilityDialog = document.getElementById('availabilityDialog');
+        const closeAvailabilityDialog = document.getElementById('closeAvailabilityDialog');
+        const keepExploringButton = document.getElementById('keepExploringButton');
+        if (availabilityDialog) {
+          if (typeof availabilityDialog.showModal === 'function') {
+            availabilityDialog.showModal();
+          } else {
+            availabilityDialog.setAttribute('open', 'open');
+          }
+
+          if (closeAvailabilityDialog) {
+            closeAvailabilityDialog.addEventListener('click', function () {
+              availabilityDialog.close();
+            });
+          }
+
+          if (keepExploringButton) {
+            keepExploringButton.addEventListener('click', function () {
+              availabilityDialog.close();
+            });
+          }
+
+          availabilityDialog.addEventListener('click', function (event) {
+            if (event.target === availabilityDialog) {
+              availabilityDialog.close();
+            }
+          });
+        }
+      })();
+      <% } %>
 
       <% if (slotOffer) { %>
       (function() {

@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   cancelBooking,
+  confirmBookingFromAvailability,
   createBooking,
   createBookingFromAlternative,
   getBookings,
@@ -12,6 +13,7 @@ const {
 const router = express.Router();
 
 router.post("/bookings", createBooking);
+router.post("/bookings/confirm", confirmBookingFromAvailability);
 router.post("/bookings/waitlist", joinWaitingList);
 router.post("/bookings/alternative", createBookingFromAlternative);
 router.post("/bookings/:id/cancel", cancelBooking);

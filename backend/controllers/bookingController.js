@@ -41,6 +41,7 @@ async function getBaseHomeData() {
     defaultBookingDate: localNow.toISOString().slice(0, 10),
     defaultBookingTime: localNow.toISOString().slice(11, 16),
     defaultBookingDayName: localNow.toLocaleDateString("en-IN", { weekday: "long" }),
+    availabilityOffer: null,
     slotOffer: null,
     title: "Reserve a Table"
   };
@@ -107,6 +108,40 @@ async function createBooking(req, res, next) {
       });
     }
 
+    const guestCount = Number(guests);
+    const bookingDateTime = parseBookingDateTime(booking_date, booking_time);
+    const table = await getAvailableTable(guestCount);
+
+    if (table) {
+      return renderHomeWithAvailability({
+        req,
+        res,
+        table,
+        formData: { name, phone, booking_date, booking_time, guests: guestCount, priority }
+      });
+    }
+
+    const waitEstimate = await buildWaitEstimate({
+      targetDateTime: bookingDateTime,
+      partySize: guestCount,
+      priorityLabel: priority
+    });
+    const alternatives = buildAlternativeSlots(waitEstimate, 4);
+    return renderHomeWithOffer({
+      req,
+      res,
+      formData: { name, phone, booking_date, booking_time, guests: guestCount, priority },
+      waitEstimate,
+      alternatives
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function confirmBookingFromAvailability(req, res, next) {
+  try {
+    const { name, phone, booking_date, booking_time, guests, priority } = req.body;
     const guestCount = Number(guests);
     const bookingDateTime = parseBookingDateTime(booking_date, booking_time);
     const table = await getAvailableTable(guestCount);
@@ -266,10 +301,24 @@ async function renderHomeWithOffer({ req, res, formData, waitEstimate, alternati
   
   return res.status(409).render("home", {
     ...baseData,
+    availabilityOffer: null,
     slotOffer: {
       formData,
       waitEstimate,
       alternatives
+    }
+  });
+}
+
+async function renderHomeWithAvailability({ req, res, table, formData }) {
+  const baseData = await getBaseHomeData();
+
+  return res.status(200).render("home", {
+    ...baseData,
+    slotOffer: null,
+    availabilityOffer: {
+      table,
+      formData
     }
   });
 }
@@ -316,6 +365,7 @@ async function cancelBooking(req, res, next) {
 
 module.exports = {
   cancelBooking,
+  confirmBookingFromAvailability,
   createBooking,
   createBookingFromAlternative,
   getBookings,
