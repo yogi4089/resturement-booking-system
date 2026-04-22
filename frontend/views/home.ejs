@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -110,7 +110,6 @@
           <div><span>Guests</span><strong><%= availabilityOffer.formData.guests %></strong></div>
           <div><span>Date</span><strong><%= availabilityOffer.formData.booking_date %></strong></div>
           <div><span>Time</span><strong><%= availabilityOffer.formData.booking_time %></strong></div>
-          <div><span>Table</span><strong>Table <%= availabilityOffer.table.id %> (<%= availabilityOffer.table.capacity %> seats)</strong></div>
         </div>
         <form action="/bookings/confirm" method="post" class="d-flex flex-wrap gap-2">
           <input type="hidden" name="name" value="<%= availabilityOffer.formData.name %>">

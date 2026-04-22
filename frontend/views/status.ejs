@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -96,7 +96,6 @@
           <div><span>Guests</span><strong><%= booking.guests %></strong></div>
           <div><span>Date</span><strong><%= booking.booking_date.toISOString().slice(0, 10) %></strong></div>
           <div><span>Time</span><strong><%= booking.booking_time.toString().slice(0, 5) %></strong></div>
-          <div><span>Table</span><strong><%= booking.assigned_table || "Waiting" %></strong></div>
           <div><span>Estimated wait</span><strong><% 
             const wt = booking.wait_time_minutes || 0;
             const hh = Math.floor(wt / 60);
