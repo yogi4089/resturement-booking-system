@@ -308,6 +308,9 @@ async function renderAdminTablesPage(req, res, next) {
       if (activeBooking) {
         customerName = activeBooking.name;
         customerPhone = activeBooking.phone;
+      } else if (table.status === "OCCUPIED") {
+        customerName = "Manual Entry";
+        customerPhone = "-";
       }
       
       const isBuffer = table.status === "AVAILABLE" && resetReadyAt && resetReadyAt > now;
