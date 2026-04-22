@@ -72,9 +72,16 @@ function getBookingStartTime(booking, fallback = null) {
     return new Date(booking.seated_at);
   }
 
-  // If not seated, don't fall back to booking time for "Seated since" tracking.
-  // This prevents the UI from showing a high "Seated since" duration 
-  // for a guest who was just promoted but hasn't physically sat down yet.
+  // Fall back to assigned_at (when table was assigned) or created_at so an
+  // OCCUPIED table always has a live "Seated since" timer.
+  if (booking.assigned_at) {
+    return new Date(booking.assigned_at);
+  }
+
+  if (booking.created_at) {
+    return new Date(booking.created_at);
+  }
+
   return fallback;
 }
 
@@ -304,6 +311,9 @@ async function renderAdminTablesPage(req, res, next) {
       }
       
       const isBuffer = table.status === "AVAILABLE" && resetReadyAt && resetReadyAt > now;
+
+      // For buffer state: show next in queue as the incoming customer
+      let nextQueueBooking = null;
       if (isBuffer) {
         const nextInLine = await getNextQueueBookingForCapacity(table.capacity);
         if (nextInLine) {
@@ -312,6 +322,16 @@ async function renderAdminTablesPage(req, res, next) {
         } else {
           customerName = "Next: Pending...";
           customerPhone = "";
+        }
+      }
+
+      // For plain AVAILABLE (no reset buffer): fetch next in queue so the card
+      // can show who will be auto-seated on "Mark Occupied".
+      if (table.status === "AVAILABLE" && !isBuffer) {
+        nextQueueBooking = await getNextQueueBookingForCapacity(table.capacity);
+        if (nextQueueBooking) {
+          customerName = "Next: " + nextQueueBooking.name;
+          customerPhone = nextQueueBooking.phone || "";
         }
       }
 
@@ -335,14 +355,19 @@ async function renderAdminTablesPage(req, res, next) {
 
       timeUntilTableFree = minutesUntil(tableFreeAt, now);
 
+      const seatedSinceDate = activeBooking && !isBuffer ? getBookingStartTime(activeBooking, null) : null;
+
       return {
         ...table,
         activeBooking,
+        nextQueueBooking,
         customerName,
         customerPhone,
         seatedSinceMinutes,
-        seatedSinceIso: activeBooking && !isBuffer && getBookingStartTime(activeBooking, null) ? getBookingStartTime(activeBooking, null).toISOString() : null,
-        seatedSinceLabel: seatedSinceMinutes === null ? (activeBooking && !isBuffer ? "Assigned (waiting to sit)" : "-") : formatRelativeMinutes(seatedSinceMinutes),
+        seatedSinceIso: seatedSinceDate ? seatedSinceDate.toISOString() : null,
+        seatedSinceLabel: seatedSinceDate
+          ? formatRelativeMinutes(minutesSince(seatedSinceDate, now))
+          : (activeBooking && !isBuffer ? "Occupied" : "-"),
         customerFreeAtLabel: formatDateTimeLabel(customerFreeAt),
         tableFreeAtLabel: formatDateTimeLabel(tableFreeAt),
         timeUntilCustomerFree,
@@ -638,10 +663,42 @@ async function updateAdminTableStatus(req, res, next) {
       return res.redirect(returnTo);
     }
 
-    await clearTableResetReadyAt(tableId);
-    await updateTableStatus(tableId, "OCCUPIED");
-    broadcastUpdate();
-    req.session.flash = { type: "warning", text: "Table marked as occupied." };
+    // Check if there is a next queued booking that fits this table
+    const table = await getTableById(tableId);
+    const nextBooking = table ? await getNextQueueBookingForCapacity(table.capacity) : null;
+
+    if (nextBooking) {
+      // Auto-assign, seat, and remove from queue — same as promoteAdminQueueBooking
+      await assignBookingToTable(nextBooking.id, tableId);
+      await clearTableResetReadyAt(tableId);
+      await updateTableStatus(tableId, "OCCUPIED");
+      await removeFromQueue(nextBooking.id);
+
+      const seatedAt = new Date();
+      const bookingRefTime = (nextBooking.booking_date && nextBooking.booking_time)
+        ? new Date(`${nextBooking.booking_date}T${String(nextBooking.booking_time).slice(0, 5)}:00`)
+        : seatedAt;
+      const durationRef = Number.isNaN(bookingRefTime.getTime()) ? seatedAt : bookingRefTime;
+      const duration = getDurationMinutes(durationRef, nextBooking.guests || 2) || AVG_DINING_TIME;
+      const expectedEndAt = new Date(seatedAt.getTime() + duration * 60000);
+      await markBookingSeated(nextBooking.id, seatedAt, expectedEndAt);
+
+      broadcastUpdate();
+      req.session.flash = {
+        type: "success",
+        text: `Table ${tableId} occupied. ${nextBooking.name} (next in queue) has been seated automatically.`
+      };
+    } else {
+      // No queue booking — mark as manually occupied
+      await clearTableResetReadyAt(tableId);
+      await updateTableStatus(tableId, "OCCUPIED");
+      broadcastUpdate();
+      req.session.flash = {
+        type: "warning",
+        text: `Table ${tableId} marked as occupied. No queued booking found — assign a booking manually.`
+      };
+    }
+
     return res.redirect(returnTo);
   } catch (error) {
     next(error);
