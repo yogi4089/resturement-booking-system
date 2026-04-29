@@ -41,7 +41,7 @@ function getGuestRange(capacity) {
 async function getNextQueueBookingForCapacity(capacity) {
   const { minGuests, maxGuests } = getGuestRange(capacity);
   const result = await query(
-    `SELECT w.booking_id, b.name, b.guests
+    `SELECT w.booking_id, b.name, b.phone, b.guests, b.booking_date, b.booking_time
      FROM waiting_queue w
      JOIN bookings b ON b.id = w.booking_id
      WHERE b.status = 'WAITING' AND b.guests >= $1 AND b.guests <= $2

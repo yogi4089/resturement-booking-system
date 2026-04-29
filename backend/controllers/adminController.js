@@ -672,10 +672,10 @@ async function updateAdminTableStatus(req, res, next) {
 
     if (nextBooking) {
       // Auto-assign, seat, and remove from queue — same as promoteAdminQueueBooking
-      await assignBookingToTable(nextBooking.id, tableId);
+      await assignBookingToTable(nextBooking.booking_id, tableId);
       await clearTableResetReadyAt(tableId);
       await updateTableStatus(tableId, "OCCUPIED");
-      await removeFromQueue(nextBooking.id);
+      await removeFromQueue(nextBooking.booking_id);
 
       const seatedAt = new Date();
       const bookingRefTime = (nextBooking.booking_date && nextBooking.booking_time)
@@ -684,7 +684,7 @@ async function updateAdminTableStatus(req, res, next) {
       const durationRef = Number.isNaN(bookingRefTime.getTime()) ? seatedAt : bookingRefTime;
       const duration = getDurationMinutes(durationRef, nextBooking.guests || 2) || AVG_DINING_TIME;
       const expectedEndAt = new Date(seatedAt.getTime() + duration * 60000);
-      await markBookingSeated(nextBooking.id, seatedAt, expectedEndAt);
+      await markBookingSeated(nextBooking.booking_id, seatedAt, expectedEndAt);
 
       broadcastUpdate();
       req.session.flash = {
