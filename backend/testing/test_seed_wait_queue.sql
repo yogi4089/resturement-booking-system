@@ -1,3 +1,7 @@
+-- cd "E:\my web\resturent managment\backend"
+-- psql -U postgres -d restaurant_management -f test_seed_wait_queue.sql
+
+
 BEGIN;
 
 -- Keep table count unchanged. This seed only updates booking/queue data.

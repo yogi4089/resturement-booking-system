@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title><%= title %> | Aurevo Dining</title>
+  <title><%= title %> | Family Dining</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Manrope:wght@400;500;700&display=swap" rel="stylesheet">
@@ -68,11 +68,25 @@
                 <button class="btn btn-sm btn-gold w-100" type="submit">Completed</button>
               </form>
             </div>
+          <% } else if (table.status === 'OCCUPIED') { %>
+            <%# Table is occupied but no booking attached — allow marking complete %>
+            <form action="/admin/tables/<%= table.id %>/status" method="post" class="w-100 mt-3">
+              <input type="hidden" name="returnTo" value="/admin/tables">
+              <input type="hidden" name="status" value="AVAILABLE">
+              <button class="btn btn-sm btn-gold w-100" type="submit">Mark Complete</button>
+            </form>
           <% } else { %>
+            <%# AVAILABLE — show who will be auto-seated, or plain manual button %>
             <form action="/admin/tables/<%= table.id %>/status" method="post" class="w-100 mt-3">
               <input type="hidden" name="returnTo" value="/admin/tables">
               <input type="hidden" name="status" value="OCCUPIED">
-              <button class="btn btn-sm btn-gold w-100" type="submit">Mark Occupied</button>
+              <% if (table.nextQueueBooking) { %>
+                <button class="btn btn-sm btn-gold w-100" type="submit">
+                  Seat <%= table.nextQueueBooking.name %> &amp; Mark Occupied
+                </button>
+              <% } else { %>
+                <button class="btn btn-sm btn-outline-gold w-100" type="submit">Mark Occupied (Manual)</button>
+              <% } %>
             </form>
           <% } %>
         </article>
@@ -83,7 +97,7 @@
   <footer class="luxury-footer">
     <div class="container">
       <div class="footer-copy">Use this view during rush windows to manage release timing and faster table turns.</div>
-      <div class="footer-copy">Aurevo Dining House</div>
+      <div class="footer-copy">Family Dining House</div>
     </div>
   </footer>
   <script>

@@ -1,3 +1,6 @@
+-- cd "E:\my web\resturent managment\backend"
+-- psql -U postgres -d restaurant_management -f schema.sql
+
 CREATE TABLE IF NOT EXISTS tables (
   id SERIAL PRIMARY KEY,
   capacity INTEGER NOT NULL CHECK (capacity > 0),
